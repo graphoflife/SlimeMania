@@ -238,7 +238,7 @@ class Game {
     if (s.levels[i] > 0 || s.money < price) { sfx('deny'); return; }
     s.money -= price;
     s.levels[i] = 1;
-    if (s.equipped.length < MAX_EQUIPPED) s.equipped.push(i);
+    this.equip(i);
     sfx('buy');
     this.applyLoadout();
     this.ui.refreshShop();
@@ -246,20 +246,23 @@ class Game {
     writeSave(s);
   }
 
+  // Equipping always works: with 3 already equipped, the one equipped longest ago goes.
+  equip(i) {
+    const s = this.state;
+    if (s.equipped.includes(i)) return;
+    s.equipped.push(i);
+    if (s.equipped.length > MAX_EQUIPPED) s.equipped.shift();
+  }
+
+  // Tapping a weapon card: equip it, or unequip it if it is on (one always stays).
   toggleEquip(i) {
     const s = this.state;
+    if (s.levels[i] <= 0) return;
     const k = s.equipped.indexOf(i);
     if (k >= 0) {
       if (s.equipped.length === 1) { sfx('deny'); return; }
       s.equipped.splice(k, 1);
-    } else {
-      if (s.equipped.length >= MAX_EQUIPPED) {
-        sfx('deny');
-        this.ui.showBanner('MAX 3 WEAPONS', 'UNEQUIP ONE FIRST', '#ff3a7c', 1.4);
-        return;
-      }
-      s.equipped.push(i);
-    }
+    } else this.equip(i);
     sfx('click');
     this.applyLoadout();
     this.ui.refreshShop();

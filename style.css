@@ -370,7 +370,18 @@ button {
   border: calc(var(--u)) solid #000;
   box-shadow: inset 0 calc(var(--u)) 0 #ffffff1a, inset 0 calc(var(--u) * -2) 0 #0004;
 }
+.card.owned { cursor: pointer; }
+.card.owned:active { transform: translateY(calc(var(--u))); }
 .card.equipped { background: #2b4a7a; box-shadow: inset 0 0 0 calc(var(--u)) var(--cyan); }
+.eq {
+  display: none;
+  margin-left: calc(var(--u) * 3);
+  padding: 0 calc(var(--u) * 2);
+  background: var(--cyan);
+  color: #000;
+  font-size: calc(var(--u) * 8);
+}
+.card.equipped .eq { display: inline-block; }
 .card.locked { opacity: 0.45; }
 .card.next { background: #4a2a55; box-shadow: inset 0 0 0 calc(var(--u)) var(--pink); }
 .icon-box {
@@ -390,10 +401,46 @@ button {
 .wstat .rate { color: var(--cyan); }
 .btns { display: flex; flex-direction: column; gap: calc(var(--u) * 3); align-items: stretch; }
 .btns .btn { height: calc(var(--u) * 13); font-size: calc(var(--u) * 8); min-width: calc(var(--u) * 46); }
-.btn.up { background: #23b04a; }
-.btn.up .cost { color: #fff; }
-.btn.equip { background: #3a5a9a; }
-.btn.equip.on { background: var(--cyan); color: #000; text-shadow: none; }
+/* square upgrade button: level, green arrow (if affordable), cost */
+.upsq {
+  width: calc(var(--u) * 40);
+  height: calc(var(--u) * 40);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--u) * 3) 0;
+  background: #1c4a2a;
+  border: calc(var(--u)) solid #000;
+  box-shadow: inset 0 calc(var(--u) * -2) 0 #0006, inset 0 calc(var(--u)) 0 #fff3;
+  font-weight: 700;
+  text-shadow: calc(var(--u)) calc(var(--u)) 0 #000;
+}
+.upsq:active { transform: translateY(calc(var(--u))); box-shadow: inset 0 calc(var(--u)) 0 #0006; }
+.upsq .uplv { color: #fff; }
+.upsq .cost { color: var(--hi); }
+.uparrow {
+  position: relative;
+  display: block;
+  width: 0;
+  height: calc(var(--u) * 9);
+  border-left: calc(var(--u) * 6) solid transparent;
+  border-right: calc(var(--u) * 6) solid transparent;
+  border-bottom: calc(var(--u) * 6) solid #3ee35a;
+}
+.uparrow::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--u) * -2);
+  top: calc(var(--u) * 6);
+  width: calc(var(--u) * 4);
+  height: calc(var(--u) * 3);
+  background: #3ee35a;
+}
+.upsq.poor { background: #33304a; }
+.upsq.poor .uparrow { border-bottom-color: #5d5875; }
+.upsq.poor .uparrow::after { background: #5d5875; }
+.upsq.poor .cost { color: #fff8; }
 .btn.buy { background: var(--pink); }
 .btn:disabled { background: #4a4560 !important; color: #fff8; cursor: default; }
 .btn.poor { background: #4a4560; color: #fffa; }

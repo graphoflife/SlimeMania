@@ -3,7 +3,7 @@ import { WEAPONS, shownDps } from './weapons.js';
 import { upgradeCost, weaponPrice, ECON } from './economy.js';
 import { MAX_EQUIPPED } from './config.js';
 import { fmt } from './format.js';
-import { sprite, makeCanvas } from './sprites.js';
+import { spriteRaw, makeCanvas } from './sprites.js';
 import { sfx, upgradeBlip } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
@@ -11,7 +11,7 @@ const $ = (id) => document.getElementById(id);
 function iconCanvas(def, silhouette) {
   const st = def.stages[0];
   const name = Array.isArray(st.sprite) ? st.sprite[0] : st.sprite;
-  const img = sprite(name, st.tints ? st.tints[0] : null);
+  const img = spriteRaw(name, st.tints ? st.tints[0] : null);
   // integer upscale so tiny projectiles still read as icons
   const k = Math.max(1, Math.floor(12 / Math.max(img.width, img.height)));
   const S = 14;
@@ -144,31 +144,31 @@ export class UI {
       el.innerHTML = `
         <div class="icon-box"></div>
         <div class="info">
-          <div class="wname"><span class="nm"></span><span class="lv"></span></div>
+          <div class="wname"><span class="nm"></span><span class="eq">ON</span></div>
           <div class="wdesc"></div>
           <div class="wstat"></div>
         </div>
         <div class="btns">
-          <button class="btn equip">EQUIP</button>
-          <button class="btn up">▲ <span class="cost"></span></button>
+          <button class="upsq" aria-label="Upgrade"><span class="uplv"></span><i class="uparrow"></i><span class="cost"></span></button>
           <button class="btn buy">BUY <span class="price"></span></button>
         </div>`;
       const card = {
         el, def, i,
         icon: el.querySelector('.icon-box'),
         nm: el.querySelector('.nm'),
-        lv: el.querySelector('.lv'),
+        uplv: el.querySelector('.uplv'),
         desc: el.querySelector('.wdesc'),
         stat: el.querySelector('.wstat'),
-        equip: el.querySelector('.equip'),
-        up: el.querySelector('.up'),
+        up: el.querySelector('.upsq'),
         cost: el.querySelector('.cost'),
         buy: el.querySelector('.buy'),
         price: el.querySelector('.price'),
         iconState: null,
       };
-      card.equip.addEventListener('click', () => this.game.toggleEquip(i));
-      card.buy.addEventListener('click', () => this.game.buyWeapon(i));
+      // the whole card is the equip button; its own buttons do not equip
+      el.addEventListener('click', () => this.game.toggleEquip(i));
+      card.buy.addEventListener('click', (e) => { e.stopPropagation(); this.game.buyWeapon(i); });
+      card.up.addEventListener('click', (e) => e.stopPropagation());
       this.bindHold(card.up, () => this.game.upgrade(i));
       this.list.appendChild(el);
       return card;
@@ -248,9 +248,8 @@ export class UI {
       c.iconState = iconState;
     }
     const eq = s.equipped.includes(c.i);
-    c.el.className = 'card' + (eq ? ' equipped' : '') + (isNext ? ' next' : '') + (!owned && !isNext ? ' locked' : '');
+    c.el.className = 'card' + (owned ? ' owned' : '') + (eq ? ' equipped' : '') + (isNext ? ' next' : '') + (!owned && !isNext ? ' locked' : '');
     c.nm.textContent = owned || isNext ? c.def.name : '???';
-    c.lv.textContent = owned ? `LV ${lvl}` : '';
     c.desc.textContent = owned || isNext ? c.def.desc : 'Unlock the weapon above first.';
     if (owned) {
       const rate = Math.min(lvl - 1, ECON.RATE_LEVELS);
@@ -258,12 +257,10 @@ export class UI {
         (rate < ECON.RATE_LEVELS ? ` <span class="rate">RATE ${rate}/${ECON.RATE_LEVELS}</span>` : ' <span class="rate">MAX RATE</span>');
     } else if (isNext) c.stat.textContent = `DPS ${fmt(shownDps(c.def, 1))} AT LV 1`;
     else c.stat.textContent = '';
-    c.equip.classList.toggle('hidden', !owned);
     c.up.classList.toggle('hidden', !owned);
     c.buy.classList.toggle('hidden', !isNext);
     if (owned) {
-      c.equip.textContent = eq ? 'ON' : 'EQUIP';
-      c.equip.classList.toggle('on', eq);
+      c.uplv.textContent = `LV ${lvl}`;
       const cost = upgradeCost(c.i, lvl);
       c.cost.textContent = fmt(cost, 'ceil');
       c.up.classList.toggle('poor', s.money < cost);

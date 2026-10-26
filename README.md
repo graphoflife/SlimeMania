@@ -17,8 +17,9 @@ slime hits and pops make sound.
 ## How to play
 
 - **Move**: drag anywhere (touch), move the mouse, or use the arrow keys / A and D.
-- **Armory**: buy weapons and upgrade them. Tap ▲ for one level, or hold it for turbo upgrades.
-  Up to 3 weapons can be equipped at once.
+- **Armory**: buy weapons and upgrade them. Tap a weapon to equip it (up to 3; equipping a fourth
+  replaces the one equipped longest ago). Tap the square ▲ button for one level, or hold it for
+  turbo upgrades.
 - **Levels**: clear the first wave of a level to unlock the next one. You can keep farming any
   unlocked level for as long as you like. If a slime reaches the bottom, the level restarts.
 - `E` / `Tab` opens the Armory on desktop, `Esc` closes it.

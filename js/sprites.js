@@ -172,8 +172,24 @@ function procedural(name) {
   return null;
 }
 
-// Projectiles are drawn 50% larger than their pixel maps (nearest neighbour).
-export const PROJECTILE_SCALE = 1.5;
+// Projectiles are drawn darker than their pixel maps and scaled up (nearest neighbour):
+// small ones 3x, big ones (bombs, meteors) less, so nothing gets bigger than ~21 px.
+const PROJECTILE_DARKEN = 0.72;
+const PROJECTILE_TARGET = 21;
+
+function projectileScale(c) {
+  const m = Math.max(c.width, c.height);
+  return Math.min(3, Math.max(1.5, Math.round((2 * PROJECTILE_TARGET) / m) / 2));
+}
+
+function darken(src, k) {
+  const g = src.getContext('2d');
+  const img = g.getImageData(0, 0, src.width, src.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) { d[i] *= k; d[i + 1] *= k; d[i + 2] *= k; }
+  g.putImageData(img, 0, 0);
+  return src;
+}
 
 function upscale(src, k) {
   const w = Math.round(src.width * k), h = Math.round(src.height * k);
@@ -184,12 +200,26 @@ function upscale(src, k) {
   return c;
 }
 
+// Unscaled (but darkened) pixel map, used for the shop icons.
+const rawCache = new Map();
+export function spriteRaw(name, tint = null) {
+  const key = tint ? name + tint : name;
+  let c = rawCache.get(key);
+  if (!c) {
+    c = darken(procedural(name) || fromAscii(ASCII[name] || ASCII.bullet, tint), PROJECTILE_DARKEN);
+    rawCache.set(key, c);
+  }
+  return c;
+}
+
+// The projectile as drawn in the game.
 const baseCache = new Map();
 export function sprite(name, tint = null) {
   const key = tint ? name + tint : name;
   let c = baseCache.get(key);
   if (!c) {
-    c = upscale(procedural(name) || fromAscii(ASCII[name] || ASCII.bullet, tint), PROJECTILE_SCALE);
+    const raw = spriteRaw(name, tint);
+    c = upscale(raw, projectileScale(raw));
     baseCache.set(key, c);
   }
   return c;
