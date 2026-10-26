@@ -53,7 +53,6 @@ const tintP = (t) => P(t, mix(t, '#ffffff', 0.55), mix(t, '#000000', 0.35), mix(
 const STEEL = P('#c9d1de', '#ffffff', '#7f8a9c', '#1c2028');
 const DARKSTEEL = P('#5a6375', '#9aa3b8', '#2a2f3a', '#0c0e12');
 const BRASS = P('#ffd23a', '#fff6b0', '#d08a10', '#4a2a06');
-const COPPER = P('#e8822a', '#ffc070', '#a24a10', '#3a1a04');
 const WOOD = P('#b06a30', '#e0a060', '#6a3a14', '#2a1404');
 const RED = P('#ff3a3a', '#ff9a9a', '#b0102a', '#3a0008');
 const GREEN = P('#3fbf3a', '#9aeb7a', '#1e6a1e', '#0a2a0a');
@@ -82,7 +81,7 @@ class Art {
         const X = x + 0.5, Y = y + 0.5, i = y * w + x;
         const d = f(X, Y);
         if (d <= 0) {
-          let col = o.fill;
+          let col = o.paint ? o.paint(X, Y) : o.fill;
           if (d > -band && (o.light || o.shade)) {
             const nx = f(X + 0.5, Y) - f(X - 0.5, Y), ny = f(X, Y + 0.5) - f(X, Y - 0.5);
             const dot = (nx * LX + ny * LY) / (Math.hypot(nx, ny) || 1);
@@ -146,25 +145,51 @@ function bombArt(w, h, r) {
     .dots([[Math.round(cx - r * 0.45), Math.round(cy - r * 0.45)]], '#ffffff');
 }
 
+// upside-down flame: round head in front (up), flickering tip trailing below
 function flameArt(w, h, outer, mid, core) {
-  const cx = w / 2, cy = h * 0.62, r = w / 2 - 0.6;
-  const drop = (rr, top) => union(circle(cx, cy, rr), poly([[cx, top], [cx - rr * 0.95, cy - rr * 0.2], [cx + rr * 0.95, cy - rr * 0.2]]));
-  const a = A(w, h).shape(drop(r, 0.3), flat(outer)).shape(drop(r * 0.68, h * 0.25), flat(mid));
-  if (core) a.shape(drop(r * 0.36, h * 0.48), flat(core));
+  const cx = w / 2, cy = h * 0.38, r = w / 2 - 0.6;
+  const drop = (rr, tip) => union(circle(cx, cy, rr), poly([[cx, tip], [cx - rr * 0.95, cy + rr * 0.2], [cx + rr * 0.95, cy + rr * 0.2]]));
+  const a = A(w, h).shape(drop(r, h - 0.3), flat(outer)).shape(drop(r * 0.68, h * 0.75), flat(mid));
+  if (core) a.shape(drop(r * 0.36, h * 0.52), flat(core));
   return a;
 }
 
+function plasmaArt(d, outer, inner) {
+  const c = d / 2;
+  return A(d, d)
+    .shape(circle(c, c, c - 0.6), P(outer, mix(outer, '#ffffff', 0.45), mix(outer, '#000000', 0.35), mix(outer, '#000000', 0.7)))
+    .shape(circle(c, c, c * 0.62), flat(inner))
+    .shape(circle(c, c, c * 0.3), flat('#ffffff'));
+}
+
+function sawArt(d, teethN) {
+  const c = d / 2, teeth = [];
+  for (let k = 0; k < teethN; k++) {
+    const a = (k * TAU) / teethN;
+    teeth.push([c + Math.cos(a) * (c - 0.3), c + Math.sin(a) * (c - 0.3)], [c + Math.cos(a + 0.42) * c * 0.72, c + Math.sin(a + 0.42) * c * 0.72]);
+  }
+  const hole = circle(c, c, Math.max(1, d * 0.09));
+  return A(d, d)
+    .shape(cut(union(poly(teeth), circle(c, c, c * 0.74)), hole), STEEL)
+    .shape(cut(ring(c, c, c * 0.45, 0.5), hole), flat('#8f99ab'));
+}
+
+// pastel rainbow, in this order across the projectile
+const PASTEL = ['#fff59a', '#ffcc8a', '#ff9aa8', '#a8f0a8', '#9ad0ff', '#d4a8ff'];
+export { PASTEL };
+
 const DEFS = {
-  bullet: () => A(7, 13)
-    .shape(seg(3.5, 4, 3.5, 9.6, 2.6), BRASS)
-    .shape(box(3.5, 10.6, 2.6, 1.4), COPPER)
-    .dots([[2, 3], [2, 4]], '#ffffff'),
+  // a small black slug: round nose, tapered tail
+  bullet: () => A(7, 12)
+    .shape(union(circle(3.5, 4, 2.7), poly([[0.9, 4.4], [6.1, 4.4], [3.5, 11.4]])), BOMB)
+    .dots([[2, 3], [2, 2]], '#b8c0d0'),
 
   pellet: () => A(7, 7).shape(circle(3.5, 3.5, 2.7), ORANGE).dot(2, 2, '#ffffff'),
 
+  // round end first, pointy end at the bottom
   drop: () => A(9, 12)
-    .shape(union(circle(4.5, 7.6, 3.4), poly([[4.5, 0.6], [1.3, 6.6], [7.7, 6.6]])), P('#3ab8ff', '#c4f0ff', '#1a6ad0', '#0a2a6a'))
-    .dots([[3, 6], [3, 7]], '#ffffff'),
+    .shape(union(circle(4.5, 4.4, 3.4), poly([[4.5, 11.4], [1.3, 5.4], [7.7, 5.4]])), P('#3ab8ff', '#c4f0ff', '#1a6ad0', '#0a2a6a'))
+    .dots([[3, 3], [3, 4]], '#ffffff'),
 
   shuriken: () => A(15, 15)
     .shape(cut(star(7.5, 7.5, 4, 7, 2.3, -Math.PI / 4 + 0.35), circle(7.5, 7.5, 1.2)), STEEL),
@@ -250,9 +275,12 @@ const DEFS = {
     .shape(box(2.5, 13.6, 2.4, 0.9), DARKSTEEL),
 
   grenade: () => grenadeArt(11, 14, GREEN),
-  grenade_red: () => grenadeArt(11, 14, RED),
-  grenade_mini: () => grenadeArt(8, 10, RED),
+  grenade_mini: () => grenadeArt(8, 10, GREEN),
 
+  plasma_m0: () => plasmaArt(11, '#a64dff', '#ff6ad5'),
+  plasma_m1: () => plasmaArt(11, '#ff2ef0', '#ff9ae6'),
+  plasma_s0: () => plasmaArt(8, '#a64dff', '#ff6ad5'),
+  plasma_s1: () => plasmaArt(8, '#ff2ef0', '#ff9ae6'),
   plasma0: () => A(15, 15)
     .shape(circle(7.5, 7.5, 6.6), P('#a64dff', '#d29aff', '#6a1fc0', '#2a0a5a'))
     .shape(circle(7.5, 7.5, 4.4), flat('#ff6ad5'))
@@ -264,33 +292,19 @@ const DEFS = {
     .shape(circle(7.5, 7.5, 2.8), flat('#ffffff'))
     .dots([[4, 10], [10, 3], [12, 8], [3, 6]], '#ffffff'),
 
-  bubble: () => A(11, 11)
-    .shape(ring(5.5, 5.5, 4.4, 0.75), P('#7fe8ff', '#ffffff', '#2aa8d8', '#0a4a7a'))
-    .dots([[3, 3], [4, 2], [2, 4]], '#ffffff'),
-  bubble_s: () => A(7, 7)
-    .shape(ring(3.5, 3.5, 2.5, 0.65), P('#7fe8ff', '#ffffff', '#2aa8d8', '#0a4a7a'))
-    .dot(2, 2, '#ffffff'),
+  bubble: () => A(8, 8)
+    .shape(ring(4, 4, 2.9, 0.6), P('#7fe8ff', '#ffffff', '#2aa8d8', '#0a4a7a'))
+    .dots([[2, 2], [3, 2]], '#ffffff'),
+  bubble_s: () => A(5, 5)
+    .shape(ring(2.5, 2.5, 1.6, 0.55), P('#7fe8ff', '#ffffff', '#2aa8d8', '#0a4a7a')),
 
-  cannonball: () => A(13, 13)
-    .shape(circle(6.5, 6.5, 5.6), BOMB)
-    .dots([[4, 4], [5, 4], [4, 5]], '#c0c6d6'),
+  rainbow: () => A(8, 13)
+    .shape(seg(4, 4, 4, 9, 3.3), { paint: (x) => PASTEL[clamp(Math.floor(x - 1), 0, 5)], line: '#5a5070' })
+    .dots([[2, 2], [2, 3]], '#ffffff'),
 
-  saw: () => {
-    const teeth = [];
-    for (let k = 0; k < 12; k++) {
-      const a = (k * TAU) / 12;
-      teeth.push([9.5 + Math.cos(a) * 9.2, 9.5 + Math.sin(a) * 9.2], [9.5 + Math.cos(a + 0.42) * 6.8, 9.5 + Math.sin(a + 0.42) * 6.8]);
-    }
-    return A(19, 19)
-      .shape(cut(union(poly(teeth), circle(9.5, 9.5, 7)), circle(9.5, 9.5, 1.6)), STEEL)
-      .shape(cut(ring(9.5, 9.5, 4.3, 0.5), circle(9.5, 9.5, 1.6)), flat('#8f99ab'));
-  },
-
-  dollar: () => A(17, 9)
-    .shape(box(8.5, 4.5, 8, 4, 0.8), P('#7dd36a', '#c4ffb4', '#3a8a3a', '#0a3a0a'))
-    .shape(cut(box(8.5, 4.5, 6.3, 2.6), box(8.5, 4.5, 5.6, 1.9)), flat('#4aa04a'))
-    .shape(ellipse(8.5, 4.5, 2.2, 2.4), flat('#d8ffcc'))
-    .dots([[8, 1], [9, 2], [8, 2], [7, 3], [8, 4], [9, 5], [8, 6], [7, 6], [8, 7]], '#1e6a1e'),
+  saw: () => sawArt(19, 12),
+  saw_m: () => sawArt(13, 9),
+  saw_s: () => sawArt(9, 7),
 
   icicle: () => A(7, 19)
     .shape(poly([[3.5, 0.3], [0.6, 14.6], [3.5, 18.7], [6.4, 14.6]]), ICE)
@@ -339,16 +353,6 @@ const DEFS = {
       .shape(circle(8.4, 4.4, 0.9), flat('#6a3a14'))
       .dots([[5, 4]], '#f0c090');
   },
-
-  prism: () => A(11, 15)
-    .shape(poly([[5.5, 0.4], [10.5, 5.4], [5.5, 14.6], [0.5, 5.4]]), ICE)
-    .shape(poly([[5.5, 1.4], [5.5, 13.4], [1.6, 5.4]]), flat('#ffffff'))
-    .shape(poly([[5.5, 5.4], [9.4, 5.4], [5.5, 12.4]]), flat('#9ae4ff'))
-    .dots([[6, 13], [5, 13]], '#ff3a7c'),
-
-  beam: (t) => A(5, 17)
-    .shape(seg(2.5, 2.5, 2.5, 14.5, 2.1), tintP(t))
-    .shape(seg(2.5, 3, 2.5, 14, 0.7), flat('#ffffff')),
 
   star: () => A(11, 11).shape(star(5.5, 5.8, 5, 5.2, 2.2), YELLOW).dot(4, 4, '#ffffff'),
   star_big: () => A(19, 19)

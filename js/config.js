@@ -4,6 +4,8 @@ export const W = 216;
 export const H = 384;
 // On screens taller than 9:16 the view extends upwards by up to this much (gameplay is unchanged).
 export const MAX_EXTRA = 120;
+// Strip below the chain belt that holds the menu bar.
+export const BOTTOM_BAR = 26;
 
 // Radii of big / medium / small slimes. 3 children have the same area as the parent.
 export const SLIME_R = [39, 22.5, 13];

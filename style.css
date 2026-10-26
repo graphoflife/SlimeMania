@@ -73,13 +73,15 @@ button {
 }
 
 /* ------------------------------------------------------------------ HUD */
+/* menu bar: in its own strip below the chain belt */
 #hud {
   position: absolute;
-  inset: 0 0 auto 0;
+  inset: auto 0 0 0;
+  height: calc(var(--u) * 26);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  padding: calc(var(--u) * 4);
+  padding: 0 calc(var(--u) * 4);
   pointer-events: none;
 }
 #hud > * { pointer-events: auto; }
@@ -171,14 +173,30 @@ button {
     linear-gradient(#fff, #fff) 0 calc(var(--u) * 4) / calc(var(--u) * 4) calc(var(--u) * 3) no-repeat;
 }
 .muted .note { opacity: 0.35; }
+/* fullscreen icon: four corner brackets */
+.fs {
+  display: block;
+  width: calc(var(--u) * 8);
+  height: calc(var(--u) * 8);
+  background:
+    linear-gradient(#fff, #fff) 0 0 / calc(var(--u) * 3) calc(var(--u)) no-repeat,
+    linear-gradient(#fff, #fff) 0 0 / calc(var(--u)) calc(var(--u) * 3) no-repeat,
+    linear-gradient(#fff, #fff) 100% 0 / calc(var(--u) * 3) calc(var(--u)) no-repeat,
+    linear-gradient(#fff, #fff) 100% 0 / calc(var(--u)) calc(var(--u) * 3) no-repeat,
+    linear-gradient(#fff, #fff) 0 100% / calc(var(--u) * 3) calc(var(--u)) no-repeat,
+    linear-gradient(#fff, #fff) 0 100% / calc(var(--u)) calc(var(--u) * 3) no-repeat,
+    linear-gradient(#fff, #fff) 100% 100% / calc(var(--u) * 3) calc(var(--u)) no-repeat,
+    linear-gradient(#fff, #fff) 100% 100% / calc(var(--u)) calc(var(--u) * 3) no-repeat;
+}
 
 /* money gained, floating out from under the money counter */
+/* money gained floats just above the money counter, newest closest to it */
 #gains {
   position: absolute;
   left: calc(var(--u) * 8);
-  top: calc(var(--u) * 20);
+  bottom: calc(var(--u) * 54);
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: calc(var(--u) * 1);
   pointer-events: none;
 }
@@ -235,7 +253,7 @@ button {
 #hint {
   position: absolute;
   left: 0; right: 0;
-  bottom: calc(var(--u) * 50);
+  bottom: calc(var(--u) * 80);
   text-align: center;
   font-weight: 700;
   animation: blink 1s steps(2) infinite;
@@ -283,7 +301,7 @@ button {
 }
 .credits {
   position: absolute;
-  bottom: calc(var(--u) * 46);
+  bottom: calc(var(--u) * 72);
   color: #fffa;
   text-shadow: calc(var(--u)) 0 0 #000, calc(var(--u) * -1) 0 0 #000, 0 calc(var(--u)) 0 #000, 0 calc(var(--u) * -1) 0 #000;
 }

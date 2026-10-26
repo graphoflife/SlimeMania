@@ -47,6 +47,8 @@ export class UI {
 
     $('btnShop').addEventListener('click', () => { sfx('click'); game.openShop(); });
     $('shopClose').addEventListener('click', () => { sfx('click'); game.closeShop(); });
+    if (document.fullscreenEnabled) $('btnFull').addEventListener('click', () => { sfx('click'); game.toggleFullscreen(); });
+    else $('btnFull').classList.add('hidden'); // e.g. iPhone: use "Add to Home Screen" instead
     this.shop.addEventListener('pointerdown', (e) => { if (e.target === this.shop) game.closeShop(); });
     $('lvPrev').addEventListener('click', () => { sfx('click'); game.setLevel(game.state.level - 1); });
     $('lvNext').addEventListener('click', () => { sfx('click'); game.setLevel(game.state.level + 1); });

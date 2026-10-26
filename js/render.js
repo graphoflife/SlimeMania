@@ -1,8 +1,9 @@
 // Draws the world onto the low-res canvas and owns all visual-only effects.
 import {
-  W, H, CHAIN_Y, SPROCKET_R, SPROCKET_LX, SPROCKET_RX, MUZZLE_Y, LOSE_Y, SLOT_OFFSETS,
+  W, H, BOTTOM_BAR, CHAIN_Y, SPROCKET_R, SPROCKET_LX, SPROCKET_RX, MUZZLE_Y, LOSE_Y, SLOT_OFFSETS,
 } from './config.js';
 import { Background } from './background.js';
+import { PASTEL } from './projectile-art.js';
 import {
   sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas,
 } from './sprites.js';
@@ -10,7 +11,8 @@ import { slimeScale } from './world.js';
 
 const TAU = Math.PI * 2;
 // explosions get the hit sprite at a bigger scale: [scale, screen shake]
-const BOOMS = { boom: [2.2, 0.8], bigboom: [3.4, 1.8], rumble: [2.6, 1.2], nova: [2.8, 1], popcorn: [1.3, 0], bubblepop: [1.1, 0] };
+const BOOMS = { boom: [2.2, 0.8], boom_s: [1.4, 0.3], bigboom: [3.4, 1.8], nova: [3, 1.4], popcorn: [1.3, 0], bubblepop: [1.1, 0] };
+const PARTY = ['#ff3a7c', '#3ad7ff', '#ffe23a', '#7dff3a', '#c04dff', '#ff8c1a', '#ffffff'];
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 // Bright, saturated, clearly different colours (plus black and white).
@@ -48,9 +50,9 @@ export class Renderer {
 
   // extra rows of sky above the playfield on tall screens
   setExtra(extra) {
-    if (extra === this.extra && this.canvas.height === H + extra) return;
+    if (extra === this.extra && this.canvas.height === H + extra + BOTTOM_BAR) return;
     this.extra = extra;
-    this.canvas.height = H + extra;
+    this.canvas.height = H + extra + BOTTOM_BAR;
     this.g.imageSmoothingEnabled = false;
   }
 
@@ -75,6 +77,11 @@ export class Renderer {
         this.hits.push({ x: e.x, y: e.y, t: 0, rot: Math.random() * TAU, sc: big[0] });
         this.shake = Math.max(this.shake, big[1]);
       }
+      if (e.fx === 'nova') this.rings.push({ x: e.x, y: e.y, r: 10, t: 0, color: '#fff7b0' });
+      else if (e.fx === 'plasma') this.rings.push({ x: e.x, y: e.y, r: 5, t: 0, color: '#ff9af6' });
+      else if (e.fx === 'firework') this.sparkle(e.x, e.y, 26, PARTY, 70, 150);
+      else if (e.fx === 'firework_s') this.sparkle(e.x, e.y, 8, PARTY, 40, 90);
+      else if (e.fx === 'sparks') this.sparkle(e.x, e.y, 8, ['#ffffff', '#ffe23a', '#ff9a1a'], 60, 120);
     } else if (e.type === 'lose') {
       this.flash = 1;
       this.flashColor = '#ff2a3c';
@@ -86,6 +93,18 @@ export class Renderer {
   }
 
   colorOf(type, size) { return this.colors[type][size]; }
+
+  // radial burst of coloured particles (fireworks, saw sparks)
+  sparkle(x, y, n, colors, v0, v1) {
+    for (let i = 0; i < n && this.parts.length < 500; i++) {
+      const a = (i / n) * TAU + Math.random() * 0.3;
+      const v = v0 + Math.random() * (v1 - v0);
+      this.parts.push({
+        x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 0.4 + Math.random() * 0.35,
+        color: colors[Math.floor(Math.random() * colors.length)], size: Math.random() < 0.4 ? 2 : 1,
+      });
+    }
+  }
 
   // ring + droplets in the slime colour
   burst(x, y, r, size, kind) {
@@ -152,13 +171,13 @@ export class Renderer {
     if (this.flash > 0) {
       g.globalAlpha = this.flash * 0.45;
       g.fillStyle = this.flashColor;
-      g.fillRect(0, 0, W, H + ex);
+      g.fillRect(0, 0, W, this.canvas.height);
       g.globalAlpha = 1;
     }
     if (opts.dim) {
       g.globalAlpha = opts.dim;
       g.fillStyle = '#140f24';
-      g.fillRect(0, 0, W, H + ex);
+      g.fillRect(0, 0, W, this.canvas.height);
       g.globalAlpha = 1;
     }
   }
@@ -193,6 +212,7 @@ export class Renderer {
     for (const p of world.projs) {
       const st = p.s;
       if (p.trail) this.drawBolt(p.trail);
+      else if (st.trail) this.drawTail(p, st);
       let name = st.sprite;
       if (Array.isArray(name)) {
         let f;
@@ -206,6 +226,60 @@ export class Renderer {
       if (name === 'flame3') g.globalAlpha = 0.6;
       g.drawImage(img, Math.round(p.x - img.width / 2), Math.round(p.y - img.height / 2));
       g.globalAlpha = 1;
+    }
+  }
+
+  // Straight tails behind a projectile, as long as the way it has flown so far.
+  drawTail(p, st) {
+    const g = this.g;
+    const sp = Math.hypot(p.vx, p.vy) || 1, ux = p.vx / sp, uy = p.vy / sp;
+    const nx = -uy, ny = ux;
+    const len = Math.min(st.trailLen, p.dist);
+    if (len < 2) return;
+    const x1 = p.x - ux * 3, y1 = p.y - uy * 3;           // start just behind the sprite centre
+    const at = (k, off = 0) => [p.x - ux * len * k + nx * off, p.y - uy * len * k + ny * off];
+    const line = (k0, k1, off, color, w) => { const [a, b] = at(k0, off), [c, d] = at(k1, off); pixLine(g, a, b, c, d, color, w); };
+    switch (st.trail) {
+      case 'laser':
+        pixLine(g, x1, y1, ...at(1), '#ff2a3c', 3);
+        pixLine(g, x1, y1, ...at(1), '#ffd0d6', 1);
+        break;
+      case 'rainbow':
+        for (let i = 0; i < 6; i++) line(0.1, 1, (i - 2.5) * 1.1, PASTEL[i], 1);
+        break;
+      case 'staff':
+        g.globalAlpha = 0.8;
+        for (let i = 0; i < 5; i++) line(0.15, 1, (i - 2) * 2, '#2a2d38', 1);
+        g.globalAlpha = 1;
+        break;
+      case 'wind':
+        g.globalAlpha = 0.75;
+        line(0.25, 0.75, 2, '#ffffff', 1);
+        line(0.4, 1, -2, '#ffffff', 1);
+        line(0.55, 0.9, 0, '#e8f4ff', 1);
+        g.globalAlpha = 1;
+        break;
+      case 'fire':
+        line(0.1, 0.45, 0, '#ffe23a', 4);
+        line(0.45, 0.75, 0, '#ff8c1a', 3);
+        line(0.75, 1, 0, '#e8301a', 2);
+        break;
+      case 'smoke':
+        g.globalAlpha = 0.7;
+        for (let k = 0.25; k <= 1; k += 0.25) { const [a, b] = at(k); discFill(g, a, b, 1.2 + k, '#c8ccd6'); }
+        g.globalAlpha = 1;
+        break;
+      case 'sparkle':
+        // twinkling little stars along the tail
+        for (let k = 0.15; k <= 1; k += 0.17) {
+          if (Math.random() < 0.3) continue;
+          const [a, b] = at(k, (Math.random() * 2 - 1) * 3);
+          const X = Math.round(a), Y = Math.round(b);
+          g.fillStyle = Math.random() < 0.5 ? '#ffffff' : '#ffe23a';
+          g.fillRect(X, Y - 1, 1, 3);
+          g.fillRect(X - 1, Y, 3, 1);
+        }
+        break;
     }
   }
 
@@ -247,7 +321,7 @@ export class Renderer {
     const g = this.g;
     const top = CHAIN_Y - SPROCKET_R - 5;
     g.fillStyle = '#2b3042';
-    g.fillRect(-4, top, W + 8, H - top + 4);
+    g.fillRect(-4, top, W + 8, H + BOTTOM_BAR - top + 4);
     g.fillStyle = '#4a5370';
     g.fillRect(-4, top, W + 8, 1);
     g.fillStyle = '#1a1d2a';
@@ -256,6 +330,11 @@ export class Renderer {
     g.fillRect(-4, CHAIN_Y + SPROCKET_R + 4, W + 8, 1);
     g.fillStyle = '#4a5370';
     for (let x = 6; x < W; x += 24) g.fillRect(x, H - 6, 2, 2);
+    // menu bar strip
+    g.fillStyle = '#1c2030';
+    g.fillRect(-4, H, W + 8, BOTTOM_BAR + 4);
+    g.fillStyle = '#3a4258';
+    g.fillRect(-4, H, W + 8, 1);
   }
 
   drawChain(offset) {

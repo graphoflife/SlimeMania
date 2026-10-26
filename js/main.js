@@ -1,5 +1,5 @@
 // Boots the game: main loop, input, level flow and the economy actions used by the UI.
-import { W, GUN_MIN_X, GUN_MAX_X, MAX_EQUIPPED, MAX_EXTRA } from './config.js';
+import { W, GUN_MIN_X, GUN_MAX_X, MAX_EQUIPPED, MAX_EXTRA, BOTTOM_BAR } from './config.js';
 import { World } from './world.js';
 import { RNG } from './rng.js';
 import { WEAPONS, buildStats } from './weapons.js';
@@ -67,10 +67,11 @@ class Game {
   fit() {
     const vw = window.visualViewport?.width ?? innerWidth;
     const vh = window.visualViewport?.height ?? innerHeight;
-    const u = Math.min(vw / 216, vh / 384);
-    const extra = clamp(Math.floor(vh / u - 384), 0, MAX_EXTRA);
+    const base = 384 + BOTTOM_BAR;
+    const u = Math.min(vw / 216, vh / base);
+    const extra = clamp(Math.floor(vh / u - base), 0, MAX_EXTRA);
     document.documentElement.style.setProperty('--u', u + 'px');
-    document.documentElement.style.setProperty('--gh', 384 + extra);
+    document.documentElement.style.setProperty('--gh', base + extra);
     this.renderer.setExtra(extra);
   }
 
@@ -84,21 +85,15 @@ class Game {
     const playing = () => this.mode === 'play' && !this.ui.shopOpen;
     el.addEventListener('pointerdown', (e) => {
       if (!playing() || e.target.closest('button, #hud')) return;
-      const gx = this.toGameX(e.clientX);
-      this.drag = { id: e.pointerId, lastX: gx };
-      if (e.pointerType === 'mouse') this.world.gun.targetX = gx;
+      this.drag = { id: e.pointerId };
+      this.world.gun.targetX = this.toGameX(e.clientX); // the gun goes where you press
+      this.moved();
     });
     el.addEventListener('pointermove', (e) => {
       if (!playing()) return;
-      const gx = this.toGameX(e.clientX);
-      if (e.pointerType === 'mouse') {
-        this.world.gun.targetX = gx; // the gun follows the mouse
-        this.moved();
-      } else if (this.drag && this.drag.id === e.pointerId) {
-        // touch: relative drag, the finger never has to cover the gun
-        const g = this.world.gun;
-        g.targetX = clamp(g.targetX + (gx - this.drag.lastX) * 1.35, GUN_MIN_X, GUN_MAX_X);
-        this.drag.lastX = gx;
+      // the gun follows the mouse, or the finger while it is down
+      if (e.pointerType === 'mouse' || (this.drag && this.drag.id === e.pointerId)) {
+        this.world.gun.targetX = this.toGameX(e.clientX);
         this.moved();
       }
     });
@@ -128,9 +123,20 @@ class Game {
   }
 
   // ---------------------------------------------------------------- flow
+  // Fullscreen (and portrait lock where the browser allows it).
+  toggleFullscreen(on = !document.fullscreenElement) {
+    const el = document.documentElement;
+    if (on && !document.fullscreenElement && el.requestFullscreen) {
+      el.requestFullscreen({ navigationUI: 'hide' })
+        .then(() => screen.orientation?.lock?.('portrait').catch(() => {}))
+        .catch(() => {});
+    } else if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+
   start() {
     initAudio();
     sfx('click');
+    if (matchMedia('(pointer: coarse)').matches) this.toggleFullscreen(true); // phones and tablets
     this.mode = 'play';
     document.getElementById('title').classList.add('hidden');
     this.ui.showHud(true);

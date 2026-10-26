@@ -4,6 +4,10 @@ import {
   W, H, SLIME_R, MUZZLE_Y, LOSE_Y, SPAWN_Y, GUN_MIN_X, GUN_MAX_X,
   GUN_MAX_SPEED, GUN_ACCEL, SLOT_OFFSETS,
 } from './config.js';
+
+// slime centres stay within the gun's reach, so no slime can hide at the edges
+const minX = (s) => Math.max(s.r, GUN_MIN_X);
+const maxX = (s) => Math.min(W - s.r, GUN_MAX_X);
 import { RNG, sample } from './rng.js';
 
 const TAU = Math.PI * 2;
@@ -189,7 +193,9 @@ export class World {
         if (em.pulse) { em.pulse.t = 1e9; this.emitPulse(em); }
         const iv = Math.max(0.02, sample(st.interval, rng));
         em.cd = Math.max(0, em.cd + iv);
-        const L = clamp(sample(st.pulse, rng), 0, iv * 0.9);
+        // a sweeping fan spreads its shots over the whole interval, so pulses join seamlessly
+        const L = st.sweep ? (iv * (st.count - 1)) / st.count : clamp(sample(st.pulse, rng), 0, iv * 0.9);
+        em.back = !em.back;
         em.pulse = { t: 0, L, i: 0 };
         this.emitPulse(em);
       }
@@ -210,8 +216,10 @@ export class World {
     const st = em.st;
     const rng = this.rng;
     let a;
-    if (st.fan && n > 1) a = st.angle.mean + st.angle.spread * ((2 * i) / (n - 1) - 1) + rng.range(-1.5, 1.5);
-    else a = sample(st.angle, rng);
+    if ((st.fan || st.sweep) && n > 1) {
+      const k = (2 * i) / (n - 1) - 1;
+      a = st.angle.mean + st.angle.spread * (st.sweep && em.back ? -k : k) + rng.range(-1.5, 1.5);
+    } else a = sample(st.angle, rng);
     const v = Math.max(20, sample(st.speed, rng));
     const rad = UP + a * DEG;
     const x = this.gun.x + SLOT_OFFSETS[em.slot];
@@ -231,8 +239,8 @@ export class World {
       hits: s.hits, rest: 0,
       ang,
       spin: s.orient === 'spin' ? range(s.spin, rng) * rng.sign() : 0,
-      ignore, tint, age: 0, dead: false,
-      trail: s.trail ? [x, y] : null,
+      ignore, tint, age: 0, dist: 0, dead: false,
+      trail: s.trail === 'bolt' ? [x, y] : null,
     });
   }
 
@@ -296,7 +304,7 @@ export class World {
     else if (roll < 0.87) { ang = DOWN + rng.range(-0.3, 0.3); spd = rng.range(15, 22); }          // hurry
     else { ang = DOWN + rng.range(-0.8, 0.8); spd = rng.range(1, 4); }                               // dawdle
     const c = Math.cos(ang);
-    if ((s.x < s.r + 10 && c < 0) || (s.x > W - s.r - 10 && c > 0)) ang = Math.PI - ang;
+    if ((s.x < minX(s) + 10 && c < 0) || (s.x > maxX(s) - 10 && c > 0)) ang = Math.PI - ang;
     spd *= SPEED_MUL[s.size];
     s.tvx = Math.cos(ang) * spd;
     s.tvy = Math.sin(ang) * spd;
@@ -319,8 +327,8 @@ export class World {
       s.ky *= kdamp;
       s.x += (s.vx + s.kx) * dt;
       s.y += (s.vy + s.ky) * dt;
-      if (s.x < s.r) { s.x = s.r; s.kx = Math.abs(s.kx) * 0.5; if (s.tvx < 0) s.tvx = -s.tvx; }
-      else if (s.x > W - s.r) { s.x = W - s.r; s.kx = -Math.abs(s.kx) * 0.5; if (s.tvx > 0) s.tvx = -s.tvx; }
+      if (s.x < minX(s)) { s.x = minX(s); s.kx = Math.abs(s.kx) * 0.5; if (s.tvx < 0) s.tvx = -s.tvx; }
+      else if (s.x > maxX(s)) { s.x = maxX(s); s.kx = -Math.abs(s.kx) * 0.5; if (s.tvx > 0) s.tvx = -s.tvx; }
       if (s.y < MIN_Y) { s.y = MIN_Y; if (s.ky < 0) s.ky = 0; }
       // facing: follows the travel direction, but never looks too far off
       s.heading = Math.atan2(s.vy, s.vx);
@@ -381,6 +389,7 @@ export class World {
       const px = p.x, py = p.y;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
+      p.dist += Math.hypot(p.vx, p.vy) * dt;
       if (p.spin) p.ang += p.spin * dt;
       if (p.trail) { p.trail.push(p.x, p.y); if (p.trail.length > 10) p.trail.splice(0, 2); }
       if (p.rest > 0) p.rest -= dt;
@@ -428,13 +437,38 @@ export class World {
     if (sl.flashCd <= 0) { sl.flash = 0.035; sl.flashCd = 0.12; } // short white flash, not too often
     sl.hurt = 0.18;
     this.ev('hit', { x: hx, y: hy });
-    if (sl.hp <= 1e-9 * sl.maxHp) this.killSlime(sl);
+    const killed = sl.hp <= 1e-9 * sl.maxHp;
+    if (killed) this.killSlime(sl);
     p.hits--;
     p.rest = s.rest;
+    // No wasted hits: if this projectile will not get another hit before it leaves the
+    // screen, this slime gets all of its remaining hits right now.
+    if (p.hits > 0 && !killed && !this.canHitAgain(p, sl, hx, hy)) {
+      const extra = s.dmg * p.hits;
+      const left = sl.hp;
+      sl.hp -= extra;
+      this.dealt += Math.min(extra, left);
+      if (sl.hp <= 1e-9 * sl.maxHp) this.killSlime(sl);
+      p.hits = 0;
+    }
     if (p.hits <= 0) {
       if (s.split) this.split(p, hx, hy, sl.id);
       p.dead = true;
     }
+  }
+
+  // Will the projectile still be inside this slime when its rest is over, or meet
+  // another slime on its way out of the screen?
+  canHitAgain(p, sl, hx, hy) {
+    const rx = hx + p.vx * p.rest, ry = hy + p.vy * p.rest;
+    if ((rx - sl.x) ** 2 + (ry - sl.y) ** 2 < sl.hr * sl.hr) return true;
+    const sp = Math.hypot(p.vx, p.vy) || 1;
+    const ex = rx + (p.vx / sp) * 700, ey = ry + (p.vy / sp) * 700;
+    for (const o of this.slimes) {
+      if (o.dead || o.id === p.ignore) continue;
+      if (segCircle(rx, ry, ex, ey, o.x, o.y, o.hr) >= 0) return true;
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------- waves

@@ -4,9 +4,15 @@ import { weaponStart, effDps, slimeHp, levelCost } from './economy.js';
 
 const KEY = 'slimemania.save.v1';
 
+// Weapon order of save versions 1 and 2 (30 weapons); later saves are migrated by id.
+const V2_IDS = ['mg', 'shotgun', 'water', 'shuriken', 'arrows', 'leaves', 'laser', 'bomb', 'banana',
+  'daggers', 'snow', 'popcorn', 'lightning', 'flames', 'nails', 'grenade', 'plasma', 'bubbles', 'cannon',
+  'saw', 'dollar', 'bigbomb', 'ice', 'fireworks', 'splitter', 'notes', 'ducks', 'meteor', 'prism', 'nova'];
+const RENAMED = { prism: 'rainbow', splitter: 'grenade' };
+
 export function freshSave() {
   return {
-    v: 2,
+    v: 3,
     money: 0,
     level: 1,       // level being played
     maxLevel: 1,    // highest unlocked level
@@ -24,12 +30,16 @@ export function loadSave() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return s;
     const d = JSON.parse(raw);
-    if (!d || (d.v !== 1 && d.v !== 2)) return s;
-    // v1 levels were positions on the old per-weapon curve; v2 weapons enter the shared
-    // ladder higher up, so keep at least the old DPS
-    if (d.v === 1) {
-      d.levels = d.levels.map((l, k) => (k === 0 || l <= 0 ? l : Math.max(1, l - weaponStart(k) + 1)));
-      d.v = 2;
+    if (!d || ![1, 2, 3].includes(d.v)) return s;
+    if (d.v < 3) {
+      // weapons were removed and merged: carry levels and equipment over by weapon id
+      const idx = (id) => WEAPONS.findIndex((w) => w.id === (RENAMED[id] || id));
+      const levels = WEAPONS.map(() => 0);
+      d.levels.forEach((l, k) => { const i = idx(V2_IDS[k]); if (i >= 0) levels[i] = Math.max(levels[i], l); });
+      if (levels[0] < 1) levels[0] = 1;
+      d.levels = levels;
+      d.equipped = [...new Set(d.equipped.map((k) => idx(V2_IDS[k])).filter((i) => i >= 0))];
+      d.v = 3;
     }
     Object.assign(s, d);
     // tolerate added weapons in later versions
@@ -42,7 +52,7 @@ export function loadSave() {
 }
 
 // Test save (?testall): every weapon owned and on the same rung of the cost ladder as the
-// last weapon at level 30, so they all deal the same DPS (Dollar Bills still 30%).
+// last weapon at level 30, so they all deal the same DPS.
 // Starts on a level one weapon clears comfortably; unlocked up to what three can clear.
 export function testAllSave() {
   const s = freshSave();
