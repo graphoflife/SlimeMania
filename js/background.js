@@ -1,5 +1,6 @@
-// Faded pixel landscape: dithered sky, drifting clouds and three parallax layers
+// Faded pixel landscape: banded sky, drifting clouds and three parallax layers
 // (snowy mountains, hills, grass) scrolling from left to right. Always the same (seeded).
+// At night the same landscape is moonlit, with stars and a moon; day and night cross-fade.
 import { W, H, MAX_EXTRA } from './config.js';
 import { RNG } from './rng.js';
 import { makeCanvas, mix } from './sprites.js';
@@ -21,12 +22,14 @@ function pnoise(n, rng) {
 const HAZE = '#d9eef6';
 const fade = (c, t = 0.45) => mix(c, HAZE, t);
 
+const DAY_SKY = ['#62afe6', '#70baeb', '#7fc4ee', '#93cff1', '#a8d9f3', '#bde3f5', '#cfeaf6', '#dcf0f7'];
+const NIGHT_SKY = ['#070a1f', '#0b1030', '#101640', '#161e50', '#1d285e', '#24326a', '#2c3c74', '#35477c'];
+
 // Covers the playfield plus MAX_EXTRA rows above it (y from -MAX_EXTRA to H).
-// Flat bands of blue with sharp, gently wavy boundaries.
-function buildSky(rng) {
+// Flat bands of colour with sharp, gently wavy boundaries.
+function buildSky(rng, stops) {
   const c = makeCanvas(W, H + MAX_EXTRA);
   const g = c.getContext('2d');
-  const stops = ['#62afe6', '#70baeb', '#7fc4ee', '#93cff1', '#a8d9f3', '#bde3f5', '#cfeaf6', '#dcf0f7'];
   const bandH = (260 + MAX_EXTRA) / stops.length;
   const waves = stops.slice(1).map((_, k) => ({
     y: (k + 1) * bandH,
@@ -45,6 +48,62 @@ function buildSky(rng) {
     }
   }
   return c;
+}
+
+// Moonlit copy of a day layer: every pixel shifted towards dark blue.
+function nightify(src) {
+  const c = makeCanvas(src.width, src.height);
+  const g = c.getContext('2d');
+  g.drawImage(src, 0, 0);
+  const img = g.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = d[i] * 0.3 + 6;
+    d[i + 1] = d[i + 1] * 0.36 + 10;
+    d[i + 2] = d[i + 2] * 0.52 + 34;
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
+// Full moon with craters and a soft glow (flat rings, no dithering).
+function buildMoon() {
+  const S = 48, c = makeCanvas(S, S), g = c.getContext('2d');
+  const k = 1.2; // moon size
+  const disc = (cx, cy, r, col) => {
+    g.fillStyle = col;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      if ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= r * r) g.fillRect(x, y, 1, 1);
+    }
+  };
+  const m = S / 2;
+  disc(m, m, 22, 'rgba(190, 206, 255, 0.07)');
+  disc(m, m, 17, 'rgba(200, 214, 255, 0.12)');
+  disc(m, m, 9.5 * k, '#f6f2da');
+  // shaded crescent on the lower right
+  g.fillStyle = '#ddd8bb';
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const inMoon = (x + 0.5 - m) ** 2 + (y + 0.5 - m) ** 2 <= (9.5 * k) ** 2;
+    const lit = (x + 0.5 - m + 1.6) ** 2 + (y + 0.5 - m + 1.6) ** 2 <= (8.6 * k) ** 2;
+    if (inMoon && !lit) g.fillRect(x, y, 1, 1);
+  }
+  disc(m - 4, m - 3.6, 2.6, '#d6d0b0');
+  disc(m + 3, m + 3, 2, '#d6d0b0');
+  disc(m + 2.4, m - 5, 1.3, '#d6d0b0');
+  disc(m - 3.4, m + 3.6, 1.2, '#d6d0b0');
+  return c;
+}
+
+function buildStars(rng) {
+  const cols = ['#ffffff', '#fff3cf', '#d6e6ff'];
+  return Array.from({ length: 150 }, () => {
+    const r = rng.next();
+    return {
+      x: Math.floor(rng.range(0, W)), y: Math.floor(rng.range(-MAX_EXTRA, 255)),
+      big: r < 0.1, base: r < 0.4 ? 1 : rng.range(0.55, 0.9),
+      color: rng.pick(cols), speed: rng.range(0.8, 3), ph: rng.range(0, 6.3),
+    };
+  });
 }
 
 function buildCloud(rng) {
@@ -198,7 +257,11 @@ function buildGrass(rng) {
 export class Background {
   constructor() {
     const rng = new RNG(4242);
-    this.sky = buildSky(new RNG(77)); // own seed: the other layers stay as they were
+    this.sky = buildSky(new RNG(77), DAY_SKY); // own seeds: the other layers stay as they were
+    this.nightSky = buildSky(new RNG(77), NIGHT_SKY);
+    this.stars = buildStars(new RNG(99));
+    this.moon = buildMoon();
+    this.t = 0;
     this.layers = [
       { ...buildMountains(rng), speed: 3, off: 0 },
       { ...buildHills(rng), speed: 9, off: 0 },
@@ -211,9 +274,12 @@ export class Background {
       // higher clouds are further away: slower
       this.clouds.push({ c, x: rng.range(-60, W), y, speed: 2 + ((y + MAX_EXTRA) / (220 + MAX_EXTRA)) * 6 });
     }
+    for (const l of this.layers) l.night = nightify(l.c);
+    for (const c of this.clouds) c.night = nightify(c.c);
   }
 
   update(dt) {
+    this.t += dt;
     for (const l of this.layers) l.off = (l.off + l.speed * dt) % TILE;
     for (const c of this.clouds) {
       c.x += c.speed * dt;
@@ -221,16 +287,45 @@ export class Background {
     }
   }
 
-  // oy: rows of extra sky above the playfield
-  draw(g, oy = 0) {
+  // oy: rows of extra sky above the playfield. night: 0 = day, 1 = night (cross-fades)
+  draw(g, oy = 0, night = 0) {
     g.drawImage(this.sky, 0, oy - MAX_EXTRA);
-    g.globalAlpha = 0.85;
-    for (const c of this.clouds) g.drawImage(c.c, Math.round(c.x), Math.round(c.y) + oy);
+    if (night > 0) {
+      g.globalAlpha = night;
+      g.drawImage(this.nightSky, 0, oy - MAX_EXTRA);
+      this.drawStars(g, oy, night);
+      g.globalAlpha = night;
+      g.drawImage(this.moon, 146, 4); // near the top of the screen
+    }
+    for (const c of this.clouds) {
+      const x = Math.round(c.x), y = Math.round(c.y) + oy;
+      g.globalAlpha = 0.85;
+      g.drawImage(c.c, x, y);
+      if (night > 0) { g.globalAlpha = 0.7 * night; g.drawImage(c.night, x, y); }
+    }
     g.globalAlpha = 1;
     for (const l of this.layers) {
       const x = Math.round(l.off) - TILE;
       g.drawImage(l.c, x, l.y + oy);
       g.drawImage(l.c, x + TILE, l.y + oy);
+      if (night > 0) {
+        g.globalAlpha = night;
+        g.drawImage(l.night, x, l.y + oy);
+        g.drawImage(l.night, x + TILE, l.y + oy);
+        g.globalAlpha = 1;
+      }
     }
+  }
+
+  drawStars(g, oy, night) {
+    for (const s of this.stars) {
+      const tw = s.base * (0.65 + 0.35 * Math.sin(this.t * s.speed + s.ph));
+      g.globalAlpha = night * tw;
+      g.fillStyle = s.color;
+      const y = s.y + oy;
+      g.fillRect(s.x, y, 1, 1);
+      if (s.big) { g.fillRect(s.x - 1, y, 3, 1); g.fillRect(s.x, y - 1, 1, 3); }
+    }
+    g.globalAlpha = 1;
   }
 }

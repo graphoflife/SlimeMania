@@ -20,6 +20,7 @@ export function freshSave() {
     equipped: [0],
     muted: false,
     hinted: false,
+    sky: 'auto',    // 'auto' (night 20:00-06:00 by the clock) | 'day' | 'night'
     kills: 0,
   };
 }

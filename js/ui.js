@@ -177,8 +177,14 @@ export class UI {
     });
     const foot = document.createElement('div');
     foot.className = 'list-foot';
-    foot.innerHTML = '<button class="btn danger">RESET GAME</button>';
-    foot.firstChild.addEventListener('click', () => { sfx('click'); $('confirm').classList.remove('hidden'); });
+    foot.innerHTML = `
+      <div class="sky-set"><span>SKY</span><button data-sky="auto">AUTO</button><button data-sky="day">DAY</button><button data-sky="night">NIGHT</button></div>
+      <button class="btn danger">RESET GAME</button>`;
+    for (const b of foot.querySelectorAll('[data-sky]')) {
+      b.addEventListener('click', () => { sfx('click'); this.game.setSky(b.dataset.sky); });
+    }
+    foot.querySelector('.danger').addEventListener('click', () => { sfx('click'); $('confirm').classList.remove('hidden'); });
+    this.skyButtons = foot.querySelectorAll('[data-sky]');
     this.list.appendChild(foot);
   }
 
@@ -221,7 +227,12 @@ export class UI {
   }
   get shopOpen() { return !this.shop.classList.contains('hidden'); }
 
+  refreshSky() {
+    for (const b of this.skyButtons) b.classList.toggle('on', b.dataset.sky === this.game.state.sky);
+  }
+
   refreshShop() {
+    this.refreshSky();
     const s = this.game.state;
     $('shopMoney').textContent = fmt(s.money);
     $('eqCount').textContent = `${s.equipped.length}/${MAX_EQUIPPED}`;

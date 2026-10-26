@@ -50,6 +50,7 @@ class Game {
     this.world.loadLevel(1, slimeHp(1));
     this.world.setLoadout([buildStats(WEAPONS[0], 31)]);
 
+    this.updateSky(true);
     this.fit();
     addEventListener('resize', () => this.fit());
     window.visualViewport?.addEventListener('resize', () => this.fit());
@@ -160,6 +161,22 @@ class Game {
     this.world.events.length = 0;
     this.ui.updateHud();
     this.ui.showBanner(`LEVEL ${s.level}`, `SLIME HP ${fmt(slimeHp(s.level))}`, '#ffffff', 1.8);
+  }
+
+  // Night between 20:00 and 06:00 on the device clock, unless chosen by hand.
+  updateSky(instant = false) {
+    const pref = this.state.sky;
+    const h = new Date().getHours();
+    const night = pref === 'night' || (pref === 'auto' && (h >= 20 || h < 6));
+    this.renderer.nightTarget = night ? 1 : 0;
+    if (instant) this.renderer.night = this.renderer.nightTarget;
+  }
+
+  setSky(mode) {
+    this.state.sky = mode;
+    this.updateSky();
+    this.ui.refreshSky();
+    writeSave(this.state);
   }
 
   setLevel(L) {
@@ -292,8 +309,10 @@ class Game {
 
   // Wipe the save and start over from the title screen.
   resetProgress() {
+    const sky = this.state.sky; // the sky setting is a preference, not progress
     clearSave();
     this.state = freshSave();
+    this.state.sky = sky;
     writeSave(this.state);
     location.reload();
   }
@@ -329,6 +348,8 @@ class Game {
       }
       if (this.mode === 'play') {
         this.saveT += dt;
+        this.skyT = (this.skyT ?? 0) + dt;
+        if (this.skyT > 30) { this.skyT = 0; this.updateSky(); }
         if (this.saveT > 5) { this.saveT = 0; writeSave(this.state); }
       }
     }

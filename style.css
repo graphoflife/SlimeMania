@@ -456,9 +456,23 @@ button {
 .upsq.buysq.poor { background: #7a2242; }
 .list-foot {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--u) * 12);
   padding: calc(var(--u) * 14) 0 calc(var(--u) * 8);
 }
+.sky-set { display: flex; align-items: center; gap: calc(var(--u) * 3); }
+.sky-set span { margin-right: calc(var(--u) * 3); color: #fffb; font-weight: 700; }
+.sky-set button {
+  height: calc(var(--u) * 14);
+  padding: 0 calc(var(--u) * 5);
+  background: #3a3550;
+  border: calc(var(--u)) solid #000;
+  box-shadow: inset 0 calc(var(--u) * -2) 0 #0005, inset 0 calc(var(--u)) 0 #fff3;
+  font-weight: 700;
+  color: #fffc;
+}
+.sky-set button.on { background: var(--cyan); color: #000; }
 .btn.danger { background: #d0202a; height: calc(var(--u) * 18); padding: 0 calc(var(--u) * 10); }
 #confirm {
   position: absolute;

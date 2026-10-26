@@ -44,6 +44,8 @@ export class Renderer {
     this.flashColor = '#ff2a3c';
     this.time = 0;
     this.extra = 0;
+    this.night = 0;        // 0 = day, 1 = night; eases towards nightTarget
+    this.nightTarget = 0;
     this.gunSprite = buildGunSprite();
   }
 
@@ -126,6 +128,8 @@ export class Renderer {
   update(dt) {
     this.time += dt;
     this.bg.update(dt);
+    const step = dt * 0.6; // ~1.7 s cross-fade
+    this.night += Math.max(-step, Math.min(step, this.nightTarget - this.night));
     for (const h of this.hits) h.t += dt;
     this.hits = this.hits.filter((h) => h.t < HIT_FRAMES * 0.05);
     for (const r of this.rings) r.t += dt;
@@ -146,7 +150,7 @@ export class Renderer {
     const g = this.g;
     const ex = this.extra;
     g.setTransform(1, 0, 0, 1, 0, 0);
-    this.bg.draw(g, ex);
+    this.bg.draw(g, ex, this.night);
     const sx = Math.round((Math.random() * 2 - 1) * this.shake);
     const sy = Math.round((Math.random() * 2 - 1) * this.shake);
     g.setTransform(1, 0, 0, 1, sx, sy + ex);

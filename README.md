@@ -26,6 +26,8 @@ the slime hits and pops make sound.
   turbo upgrades.
 - **Levels**: clear the first wave of a level to unlock the next one. You can keep farming any
   unlocked level for as long as you like. If a slime reaches the bottom, the level restarts.
+- **Night**: between 20:00 and 06:00 (device clock) the sky turns to night with stars and a moon.
+  The SKY switch at the bottom of the Armory chooses AUTO, DAY or NIGHT.
 - `E` / `Tab` opens the Armory on desktop, `Esc` closes it.
 
 Progress is saved in the browser (localStorage). The RESET GAME button at the bottom of the Armory
