@@ -222,7 +222,7 @@ class Game {
 
   upgrade(i, turbo) {
     const s = this.state;
-    const cost = upgradeCost(s.levels[i]);
+    const cost = upgradeCost(i, s.levels[i]);
     if (s.money < cost) { if (!turbo) sfx('deny'); return false; }
     s.money -= cost;
     s.levels[i]++;

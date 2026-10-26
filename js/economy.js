@@ -1,22 +1,27 @@
 // All the exponential curves of the game live here.
-// Calibrated with tools/balance.mjs (weapon power) and tools/pacing.mjs (prices).
+// Calibrated with tools/balance.mjs (weapon power) and tools/pacing.mjs (weapon entry levels).
+//
+// Every weapon sits on one shared ladder of "effective levels". DPS and upgrade cost both
+// depend only on the effective level, so two weapons whose next upgrade costs the same deal
+// the same DPS. Buying weapon k costs exactly the price of its entry rung on the ladder and
+// gives it level 1 there; its level 2 costs the next rung, and so on.
+import { WEAPON_STARTS } from './ladder.js';
+
 export const ECON = {
-  D0: 42,              // effective DPS of a level-1 weapon
-  DPS_GROWTH: 1.05,    // +5% DPS per weapon level
-  RATE_LEVELS: 30,     // the first 30 upgrades also shorten the pulse interval ...
+  D0: 42,              // DPS at effective level 1 (the starting machine gun)
+  DPS_GROWTH: 1.05,    // +5% DPS per effective level
+  RATE_LEVELS: 30,     // the first 30 upgrades of a weapon also shorten its pulse interval ...
   RATE_MIN: 0.5,       // ... down to 50% of the base interval
   H1: 18,              // big slime HP on level 1 (medium = 1/3, small = 1/9)
   HP_GROWTH: 2,        // slime HP multiplier per level
-  C0: 140,             // cost of the first upgrade (level 1 -> 2)
-  COST_GROWTH: 1.0507, // upgrade cost multiplier per level (a bit faster than DPS)
-  P1: 12023,           // price of weapon #2 (fitted by tools/pacing.mjs)
-  PG0: 5.8535,         // price ratio between consecutive weapons ...
-  PG1: 0.00538,        // ... whose log grows by this per weapon (5 min early, ~10 min late)
+  C0: 140,             // price of effective level 2 (the machine gun's first upgrade)
+  COST_GROWTH: 1.0507, // price multiplier per effective level (a bit faster than DPS)
 };
 
-export const effDps = (lvl) => ECON.D0 * ECON.DPS_GROWTH ** (lvl - 1);
+export const effDps = (eff) => ECON.D0 * ECON.DPS_GROWTH ** (eff - 1);
 
 // Multiplier on pulse interval & pulse length (1 at level 1, RATE_MIN from level 31 on).
+// Uses the weapon's own level, not the effective one.
 export const rateFactor = (lvl) =>
   ECON.RATE_MIN ** (Math.min(lvl - 1, ECON.RATE_LEVELS) / ECON.RATE_LEVELS);
 
@@ -29,13 +34,17 @@ export function nice(x) {
   return Math.ceil(x / p) * p;
 }
 
-// Cost to go from `lvl` to `lvl + 1`.
-export const upgradeCost = (lvl) => nice(ECON.C0 * ECON.COST_GROWTH ** (lvl - 1));
+// Price of one rung of the ladder: what it costs to reach effective level `eff`.
+export const levelCost = (eff) => nice(ECON.C0 * ECON.COST_GROWTH ** (eff - 2));
 
-// Price of weapon with index k (k = 0 is the free starter weapon).
-export function weaponPrice(k) {
-  if (k <= 0) return 0;
-  const j = k - 1;
-  const lnRatio = Math.log(ECON.PG0) * j + ECON.PG1 * j * (j - 1) / 2;
-  return nice(ECON.P1 * Math.exp(lnRatio));
-}
+// Effective level at which weapon k (k = 0 is the free starter weapon) enters the ladder.
+// Spaced so the next weapon takes ~5 minutes early on and ~10 minutes at the end.
+export const weaponStart = (k) => WEAPON_STARTS[k] ?? 1;
+
+export const effLevel = (k, lvl) => weaponStart(k) + lvl - 1;
+
+// Buying weapon k = paying for its level 1.
+export const weaponPrice = (k) => (k <= 0 ? 0 : levelCost(weaponStart(k)));
+
+// Cost to go from level `lvl` to `lvl + 1` on weapon k.
+export const upgradeCost = (k, lvl) => levelCost(effLevel(k, lvl) + 1);

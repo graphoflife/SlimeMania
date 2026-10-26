@@ -264,7 +264,7 @@ export class UI {
     if (owned) {
       c.equip.textContent = eq ? 'ON' : 'EQUIP';
       c.equip.classList.toggle('on', eq);
-      const cost = upgradeCost(lvl);
+      const cost = upgradeCost(c.i, lvl);
       c.cost.textContent = fmt(cost, 'ceil');
       c.up.classList.toggle('poor', s.money < cost);
     }

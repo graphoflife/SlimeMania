@@ -22,7 +22,7 @@
 // Weapons make no sound; only hits and pops do.
 //
 // Ranges: U(mean, spread) is uniform in [mean - spread, mean + spread], N(mean, std) normal.
-import { effDps, rateFactor } from './economy.js';
+import { effDps, effLevel, rateFactor } from './economy.js';
 import { BALANCE, BALANCE_LEVELS } from './balance.js';
 
 const U = (mean, spread = 0) => ({ mean, spread, dist: 'u' });
@@ -38,74 +38,74 @@ export const WEAPONS = [
     id: 'mg', name: 'Machine Gun', desc: 'Rattling bursts of hot lead.',
     interval: U(0.32, 0.04), count: 4, pulse: U(0.16, 0.02),
     speed: U(780, 45), angle: U(0, 2.5),
-    stages: [{ sprite: 'bullet', recoil: 5, rotKick: 6 }],
+    stages: [{ sprite: 'bullet', recoil: 1.7, rotKick: 6 }],
   },
   {
     id: 'shotgun', name: 'Shotgun', desc: 'One pump, eight pellets.',
     interval: U(0.9, 0.08), count: 8, pulse: U(0),
     speed: U(720, 90), angle: U(0, 15),
-    stages: [{ sprite: 'pellet', orient: 'none', recoil: 8, rotKick: 12 }],
+    stages: [{ sprite: 'pellet', orient: 'none', recoil: 2.7, rotKick: 12 }],
   },
   {
     id: 'water', name: 'Water Droplets', desc: 'A splashy stream of tiny drops.',
     interval: U(0.5, 0.1), count: 14, pulse: U(0.4, 0.05),
     speed: U(660, 75), angle: N(0, 4),
-    stages: [{ sprite: 'drop', recoil: 2, rotKick: 4 }],
+    stages: [{ sprite: 'drop', recoil: 0.7, rotKick: 4 }],
   },
   {
     id: 'shuriken', name: 'Ninja Stars', desc: 'Spinning stars that slice three times.',
     interval: U(0.55, 0.1), count: 3, pulse: U(0.18, 0.03), fan: true,
     speed: U(645, 30), angle: U(0, 9),
-    stages: [{ sprite: 'shuriken', orient: 'spin', spin: [16, 24], hits: 3, rest: 0.033, recoil: 5, rotKick: 15 }],
+    stages: [{ sprite: 'shuriken', orient: 'spin', spin: [16, 24], hits: 3, rest: 0.033, recoil: 1.7, rotKick: 15 }],
   },
   {
     id: 'arrows', name: 'Arrows', desc: 'Fast, piercing and punchy.',
     interval: U(0.5, 0.1), count: 3, pulse: U(0.15, 0.03),
     speed: U(930, 60), angle: U(0, 2),
-    stages: [{ sprite: 'arrow', hits: 3, rest: 0.04, recoil: 12, rotKick: 10 }],
+    stages: [{ sprite: 'arrow', hits: 3, rest: 0.04, recoil: 4, rotKick: 10 }],
   },
   {
     id: 'leaves', name: 'Plant Leaves', desc: 'A swirling gust of razor leaves.',
     interval: N(0.45, 0.12), count: 6, pulse: U(0.3, 0.05),
     speed: U(600, 75), angle: U(0, 25),
-    stages: [{ sprite: 'leaf', orient: 'spin', spin: [6, 12], hits: 2, rest: 0.04, recoil: 3, rotKick: 20 }],
+    stages: [{ sprite: 'leaf', orient: 'spin', spin: [6, 12], hits: 2, rest: 0.04, recoil: 1, rotKick: 20 }],
   },
   {
     id: 'laser', name: 'Laser', desc: 'Pew pew. Pierces like butter.',
     interval: U(0.4, 0.05), count: 3, pulse: U(0.12, 0.02),
     speed: U(1200), angle: U(0, 1),
-    stages: [{ sprite: 'laser', hits: 4, rest: 0.017, recoil: 3, rotKick: 5 }],
+    stages: [{ sprite: 'laser', hits: 4, rest: 0.017, recoil: 1, rotKick: 5 }],
   },
   {
     id: 'bomb', name: 'Small Bomb', desc: 'A bomb that bursts into shrapnel.',
     interval: U(0.8, 0.15), count: 2, pulse: U(0.2, 0.04),
     speed: U(600, 30), angle: U(0, 6),
     stages: [
-      { sprite: 'bomb', orient: 'spin', spin: [3, 6], share: 0.35, recoil: 12, rotKick: 14,
+      { sprite: 'bomb', orient: 'spin', spin: [3, 6], share: 0.35, recoil: 4, rotKick: 14,
         split: { count: 14, mode: 'burst', angle: 75, speed: [600, 750], fx: 'boom' } },
-      { sprite: 'frag', orient: 'none', share: 0.65, recoil: 6, rotKick: 10 },
+      { sprite: 'frag', orient: 'none', share: 0.65, recoil: 2, rotKick: 10 },
     ],
   },
   {
     id: 'banana', name: 'Banana', desc: 'Slippery. Makes slimes spin.',
     interval: U(0.7, 0.2), count: 2, pulse: U(0.25, 0.05),
     speed: U(630, 60), angle: U(0, 12),
-    stages: [{ sprite: 'banana', orient: 'spin', spin: [10, 15], hits: 5, rest: 0.027, recoil: 4, rotKick: 45 }],
+    stages: [{ sprite: 'banana', orient: 'spin', spin: [10, 15], hits: 5, rest: 0.027, recoil: 1.3, rotKick: 45 }],
   },
   {
     id: 'daggers', name: 'Daggers', desc: 'A fan of five flying blades.',
     interval: U(0.65, 0.1), count: 5, pulse: U(0), fan: true,
     speed: U(840, 30), angle: U(0, 14),
-    stages: [{ sprite: 'dagger', recoil: 8, rotKick: 10 }],
+    stages: [{ sprite: 'dagger', recoil: 2.7, rotKick: 10 }],
   },
   {
     id: 'snow', name: 'Snowflakes', desc: 'Flakes that shatter into more flakes.',
     interval: U(0.7, 0.15), count: 3, pulse: U(0.3, 0.05),
     speed: U(600, 45), angle: U(0, 12),
     stages: [
-      { sprite: 'flake', orient: 'spin', spin: [2, 4], share: 0.4, hits: 2, rest: 0.04, recoil: 2, rotKick: 6,
+      { sprite: 'flake', orient: 'spin', spin: [2, 4], share: 0.4, hits: 2, rest: 0.04, recoil: 0.7, rotKick: 6,
         split: { count: 3, mode: 'burst', angle: 40, speed: [570, 675] } },
-      { sprite: 'flake_s', orient: 'spin', spin: [3, 5], share: 0.6, hits: 2, rest: 0.04, recoil: 2, rotKick: 6 },
+      { sprite: 'flake_s', orient: 'spin', spin: [3, 5], share: 0.6, hits: 2, rest: 0.04, recoil: 0.7, rotKick: 6 },
     ],
   },
   {
@@ -113,9 +113,9 @@ export const WEAPONS = [
     interval: U(0.6, 0.15), count: 4, pulse: U(0.25, 0.05),
     speed: U(630, 60), angle: U(0, 10),
     stages: [
-      { sprite: 'kernel', orient: 'none', share: 0.3, recoil: 3, rotKick: 8,
+      { sprite: 'kernel', orient: 'none', share: 0.3, recoil: 1, rotKick: 8,
         split: { count: 3, mode: 'burst', angle: 50, speed: [570, 690], fx: 'popcorn' } },
-      { sprite: 'popcorn', orient: 'spin', spin: [4, 9], share: 0.7, hits: 2, rest: 0.033, recoil: 4, rotKick: 12 },
+      { sprite: 'popcorn', orient: 'spin', spin: [4, 9], share: 0.7, hits: 2, rest: 0.033, recoil: 1.3, rotKick: 12 },
     ],
   },
   {
@@ -123,97 +123,97 @@ export const WEAPONS = [
     interval: N(0.5, 0.12), count: 1, pulse: U(0),
     speed: U(1350), angle: U(0, 8),
     stages: [
-      { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.2, hits: 2, rest: 0.02, recoil: 4, rotKick: 10,
+      { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.2, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10,
         split: { count: 2, mode: 'cone', angle: 35, speedFactor: [0.9, 1.1] } },
-      { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.35, hits: 2, rest: 0.02, recoil: 4, rotKick: 10,
+      { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.35, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10,
         split: { count: 2, mode: 'cone', angle: 35, speedFactor: [0.9, 1.1] } },
-      { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.45, hits: 2, rest: 0.02, recoil: 4, rotKick: 10 },
+      { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.45, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10 },
     ],
   },
   {
     id: 'flames', name: 'Flames', desc: 'A roaring, endless stream of fire.',
     interval: U(0.12, 0.03), count: 5, pulse: U(0.1, 0.02),
     speed: U(630, 90), angle: N(0, 7),
-    stages: [{ sprite: ['flame0', 'flame1', 'flame2', 'flame3'], anim: 'age', orient: 'none', hits: 3, rest: 0.033, recoil: 1, rotKick: 3 }],
+    stages: [{ sprite: ['flame0', 'flame1', 'flame2', 'flame3'], anim: 'age', orient: 'none', hits: 3, rest: 0.033, recoil: 0.3, rotKick: 3 }],
   },
   {
     id: 'nails', name: 'Nail Gun', desc: 'Tack tack tack tack tack.',
     interval: U(0.12, 0.04), count: 1, pulse: U(0),
     speed: U(1050, 45), angle: U(0, 4),
-    stages: [{ sprite: 'nail', recoil: 4, rotKick: 5 }],
+    stages: [{ sprite: 'nail', recoil: 1.3, rotKick: 5 }],
   },
   {
     id: 'grenade', name: 'Grenade', desc: 'Pull pin, throw, enjoy.',
     interval: U(0.9, 0.15), count: 2, pulse: U(0.3, 0.05),
     speed: U(600, 45), angle: U(0, 8),
     stages: [
-      { sprite: 'grenade', orient: 'spin', spin: [6, 9], share: 0.25, recoil: 10, rotKick: 12,
+      { sprite: 'grenade', orient: 'spin', spin: [6, 9], share: 0.25, recoil: 3.3, rotKick: 12,
         split: { count: 14, mode: 'burst', angle: 75, speed: [570, 720], fx: 'boom' } },
-      { sprite: 'frag', orient: 'none', share: 0.75, recoil: 6, rotKick: 10 },
+      { sprite: 'frag', orient: 'none', share: 0.75, recoil: 2, rotKick: 10 },
     ],
   },
   {
     id: 'plasma', name: 'Plasma', desc: 'An orb that chews through everything.',
     interval: U(0.9, 0.2), count: 2, pulse: U(0.3, 0.05),
     speed: U(570, 30), angle: U(0, 6),
-    stages: [{ sprite: ['plasma0', 'plasma1'], anim: 8, orient: 'none', hits: 14, rest: 0.02, recoil: 4, rotKick: 6 }],
+    stages: [{ sprite: ['plasma0', 'plasma1'], anim: 8, orient: 'none', hits: 14, rest: 0.02, recoil: 1.3, rotKick: 6 }],
   },
   {
     id: 'bubbles', name: 'Bubbles', desc: 'Bubbles that pop into smaller bubbles.',
     interval: N(0.35, 0.1), count: 3, pulse: U(0.2, 0.05),
     speed: U(585, 60), angle: U(0, 18),
     stages: [
-      { sprite: 'bubble', orient: 'none', share: 0.5, recoil: 3, rotKick: 8,
+      { sprite: 'bubble', orient: 'none', share: 0.5, recoil: 1, rotKick: 8,
         split: { count: 4, mode: 'burst', angle: 60, speed: [570, 660], fx: 'bubblepop' } },
-      { sprite: 'bubble_s', orient: 'none', share: 0.5, recoil: 2, rotKick: 6 },
+      { sprite: 'bubble_s', orient: 'none', share: 0.5, recoil: 0.7, rotKick: 6 },
     ],
   },
   {
     id: 'cannon', name: 'Cannon', desc: 'Heavy iron. Shoves slimes back.',
     interval: U(0.7, 0.1), count: 2, pulse: U(0.15, 0.03),
     speed: U(675, 22.5), angle: U(0, 3),
-    stages: [{ sprite: 'cannonball', orient: 'none', hits: 4, rest: 0.027, recoil: 26, rotKick: 18 }],
+    stages: [{ sprite: 'cannonball', orient: 'none', hits: 4, rest: 0.027, recoil: 8.7, rotKick: 18 }],
   },
   {
     id: 'saw', name: 'Saw Blades', desc: 'Whirring blades that grind and grind.',
     interval: U(1.0, 0.2), count: 2, pulse: U(0.4, 0.05),
     speed: U(570, 30), angle: U(0, 10),
-    stages: [{ sprite: 'saw', orient: 'spin', spin: [24, 30], hits: 16, rest: 0.017, recoil: 2, rotKick: 10 }],
+    stages: [{ sprite: 'saw', orient: 'spin', spin: [24, 30], hits: 16, rest: 0.017, recoil: 0.7, rotKick: 10 }],
   },
   {
     id: 'dollar', name: 'Dollar Bills', desc: 'Make it rain! (It does not help much.)', quality: 0.3,
     interval: U(0.45, 0.15), count: 5, pulse: U(0.3, 0.05),
     speed: U(585, 60), angle: U(0, 25),
-    stages: [{ sprite: 'dollar', orient: 'spin', spin: [4, 8], hits: 2, rest: 0.04, recoil: 1, rotKick: 6 }],
+    stages: [{ sprite: 'dollar', orient: 'spin', spin: [4, 8], hits: 2, rest: 0.04, recoil: 0.3, rotKick: 6 }],
   },
   {
     id: 'bigbomb', name: 'Bigger Bomb', desc: 'Like the small one. But bigger.',
     interval: U(1.2, 0.2), count: 1, pulse: U(0),
     speed: U(570), angle: U(0, 4),
     stages: [
-      { sprite: 'bigbomb', orient: 'spin', spin: [2, 3.5], share: 0.3, recoil: 18, rotKick: 16,
+      { sprite: 'bigbomb', orient: 'spin', spin: [2, 3.5], share: 0.3, recoil: 6, rotKick: 16,
         split: { count: 18, mode: 'burst', angle: 80, speed: [600, 780], fx: 'bigboom' } },
-      { sprite: 'frag_big', orient: 'none', share: 0.4, hits: 2, rest: 0.027, recoil: 8, rotKick: 10,
+      { sprite: 'frag_big', orient: 'none', share: 0.4, hits: 2, rest: 0.027, recoil: 2.7, rotKick: 10,
         split: { count: 3, mode: 'cone', angle: 30, speed: [570, 690] } },
-      { sprite: 'frag', orient: 'none', share: 0.3, recoil: 5, rotKick: 8 },
+      { sprite: 'frag', orient: 'none', share: 0.3, recoil: 1.7, rotKick: 8 },
     ],
   },
   {
     id: 'ice', name: 'Ice Shards', desc: 'Frozen spikes that pierce three deep.',
     interval: U(0.45, 0.1), count: 4, pulse: U(0.1, 0.02), fan: true,
     speed: U(900, 60), angle: U(0, 8),
-    stages: [{ sprite: 'icicle', hits: 3, rest: 0.027, recoil: 6, rotKick: 8 }],
+    stages: [{ sprite: 'icicle', hits: 3, rest: 0.027, recoil: 2, rotKick: 8 }],
   },
   {
     id: 'fireworks', name: 'Fireworks', desc: 'Rockets that burst into colourful sparks.',
     interval: U(0.8, 0.2), count: 2, pulse: U(0.35, 0.05),
     speed: U(630, 45), angle: U(0, 10),
     stages: [
-      { sprite: 'rocket', share: 0.15, recoil: 6, rotKick: 8,
+      { sprite: 'rocket', share: 0.15, recoil: 2, rotKick: 8,
         split: { count: 10, mode: 'burst', angle: 70, speed: [570, 690], tint: 'random', fx: 'crackle' } },
-      { sprite: 'spark', orient: 'none', tints: TINTS.party, share: 0.5, recoil: 4, rotKick: 8,
+      { sprite: 'spark', orient: 'none', tints: TINTS.party, share: 0.5, recoil: 1.3, rotKick: 8,
         split: { count: 2, mode: 'cone', angle: 25, speed: [570, 660] } },
-      { sprite: 'twinkle', orient: 'none', tints: TINTS.party, share: 0.35, recoil: 3, rotKick: 6 },
+      { sprite: 'twinkle', orient: 'none', tints: TINTS.party, share: 0.35, recoil: 1, rotKick: 6 },
     ],
   },
   {
@@ -221,35 +221,35 @@ export const WEAPONS = [
     interval: U(1.0, 0.2), count: 1, pulse: U(0),
     speed: U(600), angle: U(0, 5),
     stages: [
-      { sprite: 'grenade_red', orient: 'spin', spin: [6, 9], share: 0.15, recoil: 10, rotKick: 12,
+      { sprite: 'grenade_red', orient: 'spin', spin: [6, 9], share: 0.15, recoil: 3.3, rotKick: 12,
         split: { count: 4, mode: 'cone', angle: 40, speed: [600, 690], fx: 'boom' } },
-      { sprite: 'grenade_mini', orient: 'spin', spin: [7, 11], share: 0.3, recoil: 8, rotKick: 10,
+      { sprite: 'grenade_mini', orient: 'spin', spin: [7, 11], share: 0.3, recoil: 2.7, rotKick: 10,
         split: { count: 10, mode: 'burst', angle: 60, speed: [570, 720], fx: 'boom' } },
-      { sprite: 'frag', orient: 'none', share: 0.55, hits: 2, rest: 0.027, recoil: 5, rotKick: 8 },
+      { sprite: 'frag', orient: 'none', share: 0.55, hits: 2, rest: 0.027, recoil: 1.7, rotKick: 8 },
     ],
   },
   {
     id: 'notes', name: 'Music Notes', desc: 'Every shot plays a tune.',
     interval: U(0.4, 0.1), count: 3, pulse: U(0.3, 0.05),
     speed: U(630, 45), angle: U(0, 15),
-    stages: [{ sprite: 'note', orient: 'none', tints: TINTS.party, hits: 2, rest: 0.04, recoil: 5, rotKick: 25 }],
+    stages: [{ sprite: 'note', orient: 'none', tints: TINTS.party, hits: 2, rest: 0.04, recoil: 1.7, rotKick: 25 }],
   },
   {
     id: 'ducks', name: 'Rubber Ducks', desc: 'Squeaky, bouncy, surprisingly heavy.',
     interval: U(0.8, 0.2), count: 2, pulse: U(0.3, 0.05),
     speed: U(630, 60), angle: U(0, 12),
-    stages: [{ sprite: 'duck', orient: 'spin', spin: [5, 8], hits: 4, rest: 0.033, recoil: 22, rotKick: 35 }],
+    stages: [{ sprite: 'duck', orient: 'spin', spin: [5, 8], hits: 4, rest: 0.033, recoil: 7.3, rotKick: 35 }],
   },
   {
     id: 'meteor', name: 'Meteor', desc: 'Rock, then rocks, then pebbles.',
     interval: U(1.0, 0.2), count: 1, pulse: U(0),
     speed: U(570, 15), angle: U(0, 6),
     stages: [
-      { sprite: 'meteor', share: 0.3, hits: 2, rest: 0.033, recoil: 16, rotKick: 14,
+      { sprite: 'meteor', share: 0.3, hits: 2, rest: 0.033, recoil: 5.3, rotKick: 14,
         split: { count: 6, mode: 'cone', angle: 50, speed: [570, 690], fx: 'rumble' } },
-      { sprite: 'rock', orient: 'spin', spin: [3, 6], share: 0.35, hits: 2, rest: 0.033, recoil: 8, rotKick: 10,
+      { sprite: 'rock', orient: 'spin', spin: [3, 6], share: 0.35, hits: 2, rest: 0.033, recoil: 2.7, rotKick: 10,
         split: { count: 4, mode: 'burst', angle: 50, speed: [570, 660] } },
-      { sprite: 'pebble', orient: 'none', share: 0.35, recoil: 4, rotKick: 8 },
+      { sprite: 'pebble', orient: 'none', share: 0.35, recoil: 1.3, rotKick: 8 },
     ],
   },
   {
@@ -257,9 +257,9 @@ export const WEAPONS = [
     interval: U(0.8, 0.15), count: 1, pulse: U(0),
     speed: U(840), angle: U(0, 3),
     stages: [
-      { sprite: 'prism', orient: 'none', share: 0.1, recoil: 4, rotKick: 6,
+      { sprite: 'prism', orient: 'none', share: 0.1, recoil: 1.3, rotKick: 6,
         split: { count: 7, mode: 'fan', angle: 24, speedFactor: [1.1, 1.2], tint: 'index', fx: 'shimmer' } },
-      { sprite: 'beam', tints: TINTS.rainbow, share: 0.9, hits: 3, rest: 0.02, recoil: 4, rotKick: 8 },
+      { sprite: 'beam', tints: TINTS.rainbow, share: 0.9, hits: 3, rest: 0.02, recoil: 1.3, rotKick: 8 },
     ],
   },
   {
@@ -267,11 +267,11 @@ export const WEAPONS = [
     interval: U(1.0, 0.2), count: 1, pulse: U(0),
     speed: U(600), angle: U(0, 4),
     stages: [
-      { sprite: 'star_big', orient: 'spin', spin: [4, 6], share: 0.2, hits: 2, rest: 0.033, recoil: 10, rotKick: 14,
+      { sprite: 'star_big', orient: 'spin', spin: [4, 6], share: 0.2, hits: 2, rest: 0.033, recoil: 3.3, rotKick: 14,
         split: { count: 8, mode: 'burst', angle: 75, speed: [570, 690], fx: 'nova' } },
-      { sprite: 'star', orient: 'spin', spin: [6, 10], share: 0.4, hits: 2, rest: 0.033, recoil: 6, rotKick: 10,
+      { sprite: 'star', orient: 'spin', spin: [6, 10], share: 0.4, hits: 2, rest: 0.033, recoil: 2, rotKick: 10,
         split: { count: 5, mode: 'burst', angle: 60, speed: [570, 690], fx: 'crackle' } },
-      { sprite: 'spark_w', orient: 'none', share: 0.4, hits: 2, rest: 0.027, recoil: 4, rotKick: 8 },
+      { sprite: 'spark_w', orient: 'none', share: 0.4, hits: 2, rest: 0.027, recoil: 1.3, rotKick: 8 },
     ],
   },
 ];
@@ -290,9 +290,11 @@ function balance(id, level) {
 }
 
 const STAGE_DEFAULTS = {
-  orient: 'dir', spin: [0, 0], share: 1, hits: 1, rest: 0.033, recoil: 5, rotKick: 8,
+  orient: 'dir', spin: [0, 0], share: 1, hits: 1, rest: 0.033, recoil: 1.7, rotKick: 8,
   split: null, trail: null, tints: null, anim: null,
 };
+
+WEAPONS.forEach((w, i) => { w.index = i; });
 
 for (const w of WEAPONS) {
   w.quality ??= 1;
@@ -300,10 +302,11 @@ for (const w of WEAPONS) {
   w.stages = w.stages.map((s) => ({ ...STAGE_DEFAULTS, ...s }));
 }
 
-// Build the runtime stats of a weapon at a level. nominalDps overrides the DPS
-// (used by the balancing tool); otherwise it follows the level curve.
+// Build the runtime stats of a weapon at its own level. DPS follows the effective level on
+// the shared ladder; pulse speed and balance follow the weapon's own level.
+// nominalDps overrides the DPS (used by the balancing tool).
 export function buildStats(def, level, nominalDps) {
-  const dps = nominalDps ?? effDps(level) * def.quality * balance(def.id, level);
+  const dps = nominalDps ?? shownDps(def, level) * balance(def.id, level);
   const f = rateFactor(level);
   const interval = { ...def.interval, mean: def.interval.mean * f, spread: def.interval.spread * f };
   const pulse = { ...def.pulse, mean: def.pulse.mean * f, spread: def.pulse.spread * f };
@@ -320,4 +323,6 @@ export function buildStats(def, level, nominalDps) {
 }
 
 // DPS shown in the shop (what the weapon effectively deals).
-export const shownDps = (def, level) => effDps(level) * def.quality;
+export function shownDps(def, level) {
+  return effDps(effLevel(def.index, level)) * def.quality;
+}

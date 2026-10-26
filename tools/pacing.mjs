@@ -1,15 +1,18 @@
 // Economy pacing model. Income is roughly LAMBDA * effective DPS (measured by balance.mjs).
-// 1) Construct the weapon prices so that weapon k gets unlocked at the target time
-//    (5 minutes after the previous one at the start, 10 minutes for the last one).
-// 2) Fit the smooth price formula of economy.js to that and print it.
-// 3) Re-simulate with the fitted formula and print the resulting timeline.
+// Weapons live on one shared ladder: buying weapon k costs the rung where it enters
+// (weaponStart). This tool
+// 1) constructs the entry levels so that weapon k gets unlocked at its target time
+//    (5 minutes after the previous one at the start, 10 minutes for the last one),
+// 2) writes them to js/ladder.js (with --write),
+// 3) re-simulates with them and prints the resulting timeline.
 //
-//   node tools/pacing.mjs
-import { ECON, effDps, upgradeCost, slimeHp, weaponPrice } from '../js/economy.js';
+//   node tools/pacing.mjs [--write]
+import { writeFileSync } from 'node:fs';
+import { effDps, levelCost, slimeHp } from '../js/economy.js';
 import { WEAPONS } from '../js/weapons.js';
 
-const LAMBDA = 0.55;      // income per effective DPS when playing near your best level
-const HUMAN_RHO = 1.6;    // DPS / big-slime-HP a human needs to clear a level (autopilot: 1.39)
+const LAMBDA = 0.6;       // income per effective DPS when playing near your best level
+const HUMAN_RHO = 1.4;    // DPS / big-slime-HP a player needs to clear a level (autopilot: ~1.2)
 const SAVE_S = 60;        // the player saves up to a minute of income for the next weapon
 const NW = WEAPONS.length;
 
@@ -23,87 +26,78 @@ function bestLevel(p) {
   return p >= HUMAN_RHO * slimeHp(1) ? L : 0;
 }
 
-function simulate(priceOf, { construct = false, log = false } = {}) {
-  const lv = [1];
+// startOf(k): entry level of weapon k, or null to construct it from the target time
+function simulate(startOf, log = false) {
+  const eff = [1];           // effective level of every owned weapon
   let equipped = [0];
   let owned = 1;
   let money = 0;
-  const prices = [0];
+  const starts = [1];
   const buyTimes = [0];
-  const dt = 1;
   let t = 0;
-  const power = () => equipped.reduce((s, i) => s + effDps(lv[i]) * WEAPONS[i].quality, 0);
+  const dps = (i) => effDps(eff[i]) * WEAPONS[i].quality;
+  const power = () => equipped.reduce((s, i) => s + dps(i), 0);
   while (owned < NW && t < 8 * 3600) {
     const inc = LAMBDA * power();
-    money += inc * dt;
-    t += dt;
+    money += inc;
+    t += 1;
     let saving = false;
-    let buy = false;
-    if (construct) {
+    let start = null;
+    if (!startOf) {
       if (t >= targets[owned] - SAVE_S) saving = true;
-      if (t >= targets[owned]) { prices.push(money); buy = true; }
+      if (t >= targets[owned]) {
+        start = 2;
+        while (levelCost(start + 1) <= money) start++;
+      }
     } else {
-      const price = priceOf(owned);
-      if (price <= money + inc * SAVE_S) saving = true;
-      if (money >= price) { money -= price; buy = true; }
+      const s = startOf(owned);
+      if (levelCost(s) <= money + inc * SAVE_S) saving = true;
+      if (money >= levelCost(s)) start = s;
     }
-    if (buy) {
-      if (construct) money = 0;
-      lv.push(1);
+    if (start !== null) {
+      money -= levelCost(start);
+      eff.push(start);
+      starts.push(start);
       const k = owned++;
       buyTimes.push(t);
       if (equipped.length < 3) equipped.push(k);
       else {
         let worst = 0;
-        for (let j = 1; j < 3; j++) if (WEAPONS[equipped[j]].quality * effDps(lv[equipped[j]]) < WEAPONS[equipped[worst]].quality * effDps(lv[equipped[worst]])) worst = j;
-        // the dollar bills are a joke: nobody keeps them equipped
-        if (WEAPONS[k].quality >= 1) equipped[worst] = k;
+        for (let j = 1; j < 3; j++) if (dps(equipped[j]) < dps(equipped[worst])) worst = j;
+        if (dps(k) > dps(equipped[worst])) equipped[worst] = k;
       }
       saving = false;
     }
     if (!saving) {
       for (;;) {
         let ci = equipped[0];
-        for (const i of equipped) if (lv[i] < lv[ci]) ci = i;
-        const c = upgradeCost(lv[ci]);
+        for (const i of equipped) if (eff[i] < eff[ci]) ci = i;
+        const c = levelCost(eff[ci] + 1);
         if (c > money) break;
         money -= c;
-        lv[ci]++;
+        eff[ci]++;
       }
     }
-    if (log && (t % 600 === 0 || buy)) {
+    if (log && (t % 600 === 0 || start !== null)) {
       const p = power();
-      console.log(`${(t / 60).toFixed(1).padStart(6)} min  weapons ${String(owned).padStart(2)}  levels ${equipped.map((i) => lv[i]).join('/')}  dps ${p.toExponential(2)}  best slime level ${bestLevel(p)}${buy ? '  <- bought ' + WEAPONS[owned - 1].name : ''}`);
+      console.log(`${(t / 60).toFixed(1).padStart(6)} min  weapons ${String(owned).padStart(2)}  eff ${equipped.map((i) => eff[i]).join('/')}  dps ${p.toExponential(2)}  best slime level ${bestLevel(p)}${start !== null ? '  <- bought ' + WEAPONS[owned - 1].name + ' at eff ' + start : ''}`);
     }
   }
-  return { prices, buyTimes };
+  return { starts, buyTimes };
 }
 
 // 1) construct
-const { prices } = simulate(null, { construct: true });
-// 2) fit ln(price_k) = a + b*j + c*j*(j-1)/2 with j = k-1 (least squares)
-const rows = [];
-for (let k = 1; k < NW; k++) { const j = k - 1; rows.push([1, j, (j * (j - 1)) / 2, Math.log(prices[k])]); }
-const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], B = [0, 0, 0];
-for (const r of rows) for (let i = 0; i < 3; i++) { B[i] += r[i] * r[3]; for (let j = 0; j < 3; j++) A[i][j] += r[i] * r[j]; }
-// solve 3x3
-function solve(M, v) {
-  const m = M.map((r, i) => [...r, v[i]]);
-  for (let i = 0; i < 3; i++) {
-    let p = i; for (let r = i + 1; r < 3; r++) if (Math.abs(m[r][i]) > Math.abs(m[p][i])) p = r;
-    [m[i], m[p]] = [m[p], m[i]];
-    for (let r = 0; r < 3; r++) if (r !== i) { const f = m[r][i] / m[i][i]; for (let c = i; c < 4; c++) m[r][c] -= f * m[i][c]; }
-  }
-  return m.map((r, i) => r[3] / r[i]);
+const { starts } = simulate(null);
+if (process.argv.includes('--write')) {
+  writeFileSync(new URL('../js/ladder.js', import.meta.url), `// Generated by tools/pacing.mjs --write. Do not edit by hand.
+// Effective level at which each weapon enters the shared ladder (index = weapon).
+export const WEAPON_STARTS = ${JSON.stringify(starts)};
+`);
+  console.log('wrote js/ladder.js');
 }
-const [a, b, c] = solve(A, B);
-ECON.P1 = Math.round(Math.exp(a));
-ECON.PG0 = +Math.exp(b).toFixed(4);
-ECON.PG1 = +c.toFixed(5);
-console.log(`constructed prices: ${prices.slice(1, 6).map((p) => p.toExponential(2)).join(', ')} ... ${prices[NW - 1].toExponential(2)}`);
-console.log(`fit:  P1: ${ECON.P1}, PG0: ${ECON.PG0}, PG1: ${ECON.PG1}`);
+console.log('entry levels:', starts.join(' '));
 
-// 3) verify with the formula
-console.log('\ntimeline with fitted prices:');
-const res = simulate(weaponPrice, { log: true });
+// 3) verify
+console.log('\ntimeline:');
+const res = simulate((k) => starts[k], true);
 console.log('\ngaps (min):', res.buyTimes.slice(1).map((t, i) => ((t - res.buyTimes[i]) / 60).toFixed(1)).join(' '));

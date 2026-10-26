@@ -172,12 +172,24 @@ function procedural(name) {
   return null;
 }
 
+// Projectiles are drawn 50% larger than their pixel maps (nearest neighbour).
+export const PROJECTILE_SCALE = 1.5;
+
+function upscale(src, k) {
+  const w = Math.round(src.width * k), h = Math.round(src.height * k);
+  const c = makeCanvas(w, h);
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.drawImage(src, 0, 0, w, h);
+  return c;
+}
+
 const baseCache = new Map();
 export function sprite(name, tint = null) {
   const key = tint ? name + tint : name;
   let c = baseCache.get(key);
   if (!c) {
-    c = procedural(name) || fromAscii(ASCII[name] || ASCII.bullet, tint);
+    c = upscale(procedural(name) || fromAscii(ASCII[name] || ASCII.bullet, tint), PROJECTILE_SCALE);
     baseCache.set(key, c);
   }
   return c;
@@ -223,11 +235,13 @@ export function rotated(src, ang) {
 
 // ---------------------------------------------------------------- slimes
 export function slimePalette(base) {
-  if (base === '#111111') return { base: '#2a2a38', shade: '#14141c', light: '#5c5c78', spec: '#b0b0d0' };
-  if (base === '#ffffff') return { base: '#f2f4f8', shade: '#c4cce0', light: '#ffffff', spec: '#ffffff' };
+  if (base === '#111111') return { base: '#2a2a38', shade: '#191922', deep: '#0b0b10', light: '#5c5c78', spec: '#b0b0d0' };
+  if (base === '#ffffff') return { base: '#f2f4f8', shade: '#cdd4e6', deep: '#a3aecb', light: '#ffffff', spec: '#ffffff' };
+  const shade = mix(mix(base, '#000000', 0.28), '#3020a0', 0.15);
   return {
     base,
-    shade: mix(mix(base, '#000000', 0.32), '#3020a0', 0.18),
+    shade,
+    deep: mix(mix(base, '#000000', 0.5), '#3020a0', 0.2),
     light: mix(base, '#ffffff', 0.5),
     spec: '#ffffff',
   };
@@ -261,12 +275,14 @@ export function slimeBody(color, size, sqi, flash) {
       if (ui * ui + vi * vi > 1) col = '#000000';
       else if (flash) col = '#ffffff';
       else {
+        // clean bands of flat colour, no dithering
         const shadeT = u * 0.45 + v * 0.75;
         const hx = u + 0.38, hy = v + 0.42;
         const hd = hx * hx * 1.3 + hy * hy;
         col = pal.base;
-        if (shadeT > 0.42 || (shadeT > 0.32 && (x + y) % 2 === 0)) col = pal.shade;
-        if (hd < 0.07 || (hd < 0.1 && (x + y) % 2 === 0)) col = pal.light;
+        if (shadeT > 0.38) col = pal.shade;
+        if (shadeT > 0.68 && d > 0.6) col = pal.deep;
+        if (hd < 0.085) col = pal.light;
         const sx = u + 0.5, sy = v + 0.5;
         if (sx * sx + sy * sy < 0.012) col = pal.spec;
         if (d > 0.62 && u + v < -0.75 && d < 0.78) col = pal.light; // rim light top-left

@@ -143,8 +143,9 @@ export class Renderer {
 
     this.drawSlimes(world);
     this.drawHousing();
-    this.drawChain(world.gun.x);
-    this.drawGun(world.gun, world.emitters.length);
+    const gx = Math.round(world.gun.x); // gun and chain move together in whole pixels
+    this.drawChain(gx);
+    this.drawGun(gx, world.gun, world.emitters.length);
     this.drawProjectiles(world);
     this.drawEffects();
     g.setTransform(1, 0, 0, 1, 0, 0);
@@ -213,9 +214,10 @@ export class Renderer {
     for (let i = 0; i + 3 < tr.length; i += 2) {
       const x0 = tr[i], y0 = tr[i + 1], x1 = tr[i + 2], y1 = tr[i + 3];
       const mx = (x0 + x1) / 2 + (Math.random() * 2 - 1) * 3, my = (y0 + y1) / 2 + (Math.random() * 2 - 1) * 3;
-      pixLine(g, x0, y0, mx, my, '#fff27a');
-      pixLine(g, mx, my, x1, y1, '#fff27a');
-      pixLine(g, x0 + 1, y0, mx + 1, my, '#ffffff');
+      pixLine(g, x0, y0, mx, my, '#fff27a', 3);
+      pixLine(g, mx, my, x1, y1, '#fff27a', 3);
+      pixLine(g, x0, y0, mx, my, '#ffffff', 1);
+      pixLine(g, mx, my, x1, y1, '#ffffff', 1);
     }
   }
 
@@ -259,8 +261,24 @@ export class Renderer {
   drawChain(offset) {
     const g = this.g;
     const L = SPROCKET_LX, R = SPROCKET_RX, CY = CHAIN_Y, RR = SPROCKET_R;
-    // toothed sprockets turn with the chain
-    const rot = offset / RR;
+    // Links sit exactly 4 px apart on the straight runs, so a 1 px gun move shifts every link
+    // by exactly 1 px (no jitter). The arcs around the sprockets absorb the remainder.
+    const PITCH = 4;
+    const straight = R - L;
+    const N = Math.round((2 * straight + 2 * Math.PI * RR) / PITCH / 2) * 2;
+    const total = N * PITCH;
+    const half = (total - 2 * straight) / 2;
+    const pos = (s) => {
+      s = ((s % total) + total) % total;
+      if (s < straight) return [L + s, CY - RR];
+      if ((s -= straight) < half) { const a = -Math.PI / 2 + (s / half) * Math.PI; return [R + Math.cos(a) * RR, CY + Math.sin(a) * RR]; }
+      if ((s -= half) < straight) return [R - s, CY + RR];
+      s -= straight;
+      const a = Math.PI / 2 + (s / half) * Math.PI;
+      return [L + Math.cos(a) * RR, CY + Math.sin(a) * RR];
+    };
+    // toothed sprockets turn exactly as fast as the chain runs around them
+    const rot = (offset / half) * Math.PI;
     for (const cx of [L, R]) {
       discFill(g, cx, CY, RR + 0.5, '#14161d');
       discFill(g, cx, CY, RR - 0.5, '#4b5368');
@@ -277,24 +295,10 @@ export class Renderer {
       g.fillStyle = '#ffffff';
       g.fillRect(cx - 1, CY - 1, 1, 1);
     }
-    const straight = R - L;
-    const half = Math.PI * RR;
-    const total = 2 * straight + 2 * half;
-    const N = Math.round(total / 4 / 2) * 2;
-    const pitch = total / N;
-    const pos = (s) => {
-      s = ((s % total) + total) % total;
-      if (s < straight) return [L + s, CY - RR];
-      if ((s -= straight) < half) { const a = -Math.PI / 2 + s / RR; return [R + Math.cos(a) * RR, CY + Math.sin(a) * RR]; }
-      if ((s -= half) < straight) return [R - s, CY + RR];
-      s -= straight;
-      const a = Math.PI / 2 + s / RR;
-      return [L + Math.cos(a) * RR, CY + Math.sin(a) * RR];
-    };
     // inner links first, outer plates on top
     for (const parity of [1, 0]) {
       for (let i = parity; i < N; i += 2) {
-        let [x, y] = pos(i * pitch + offset);
+        let [x, y] = pos(i * PITCH + offset);
         x = Math.round(x); y = Math.round(y);
         if (parity) {
           g.fillStyle = '#14161d'; g.fillRect(x - 2, y - 2, 5, 4);
@@ -310,9 +314,8 @@ export class Renderer {
     }
   }
 
-  drawGun(gun, slots) {
+  drawGun(x, gun, slots) {
     const g = this.g;
-    const x = Math.round(gun.x);
     const base = CHAIN_Y - SPROCKET_R - 2; // rides on the top run
     const spr = this.gunSprite;
     // barrels: side ones first
@@ -320,14 +323,15 @@ export class Renderer {
       const bx = x + SLOT_OFFSETS[s];
       const active = s < slots;
       const kick = gun.kick[s] > 0.6 ? 2 : gun.kick[s] > 0.25 ? 1 : 0;
-      const w = s === 0 ? 5 : 4;
+      // odd widths so every barrel is exactly centred; shaded like a cylinder (mirror-symmetric)
+      const w = s === 0 ? 5 : 3;
       const y0 = MUZZLE_Y + (s === 0 ? 0 : 3) + (active ? kick : 2);
       const len = base - 9 - y0;
-      const lx = bx - Math.floor(w / 2);
+      const lx = bx - (w - 1) / 2;
       g.fillStyle = '#000000'; g.fillRect(lx - 1, y0 - 1, w + 2, len + 2);
-      g.fillStyle = active ? '#c9d1de' : '#7f8a9c'; g.fillRect(lx, y0, w, len);
-      g.fillStyle = active ? '#ffffff' : '#a5aebd'; g.fillRect(lx, y0, 1, len);
-      g.fillStyle = '#5a6375'; g.fillRect(lx + w - 1, y0, 1, len);
+      g.fillStyle = active ? '#8f99ab' : '#6a7486'; g.fillRect(lx, y0, w, len);
+      g.fillStyle = active ? '#c9d1de' : '#8f99ab'; g.fillRect(lx + (w > 3 ? 1 : 0), y0, w > 3 ? w - 2 : w, len);
+      g.fillStyle = active ? '#ffffff' : '#a5aebd'; g.fillRect(bx, y0, 1, len);
       g.fillStyle = '#20232c'; g.fillRect(lx, y0, w, 1);
       g.fillStyle = active ? '#ff3a7c' : '#7a3a50'; g.fillRect(lx, y0 + 2, w, 1);
       if (active && gun.kick[s] > 0.8) {
@@ -358,7 +362,7 @@ function buildGunSprite() {
     else if (inBase) {
       if (y === 9 || y === 15 || x === 1 || x === w - 2) col = '#000000';
       else if (y === 10) col = '#fff3a8';
-      else if (y >= 12 && y <= 14) col = ((x + y) % 6) < 3 ? '#ffd21a' : '#1a1a22'; // hazard stripes
+      else if (y >= 12 && y <= 14) col = ((Math.abs(x - 14) + y) % 6) < 3 ? '#ffd21a' : '#1a1a22'; // hazard chevrons
       else col = '#ffb02e';
     } else {
       if (d2 > (R - 1.1) ** 2) col = '#000000';
@@ -379,14 +383,15 @@ function buildGunSprite() {
   return c;
 }
 
-function pixLine(g, x0, y0, x1, y1, color) {
+function pixLine(g, x0, y0, x1, y1, color, w = 1) {
   g.fillStyle = color;
+  const o = Math.floor(w / 2);
   x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
   const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   let err = dx + dy;
   for (let n = 0; n < 200; n++) {
-    g.fillRect(x0, y0, 1, 1);
+    g.fillRect(x0 - o, y0 - o, w, w);
     if (x0 === x1 && y0 === y1) break;
     const e2 = 2 * err;
     if (e2 >= dy) { err += dy; x0 += sx; }

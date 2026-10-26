@@ -162,11 +162,17 @@ export class World {
     const g = this.gun;
     const tx = clamp(g.targetX, GUN_MIN_X, GUN_MAX_X);
     const dx = tx - g.x;
-    // time-optimal approach: full speed, then brake just in time
-    const desired = Math.sign(dx) * Math.min(GUN_MAX_SPEED, Math.sqrt(2 * GUN_ACCEL * Math.abs(dx)) * 0.9);
-    const maxDv = GUN_ACCEL * dt;
-    g.vx += clamp(desired - g.vx, -maxDv, maxDv);
-    g.x += g.vx * dt;
+    if (Math.abs(dx) < 0.5 && Math.abs(g.vx) < 80) {
+      // close enough: sit exactly on the target instead of wobbling around it
+      g.x = tx;
+      g.vx = 0;
+    } else {
+      // time-optimal approach: full speed, then brake just in time, never past the target
+      const desired = Math.sign(dx) * Math.min(GUN_MAX_SPEED, Math.sqrt(2 * GUN_ACCEL * Math.abs(dx)) * 0.9, Math.abs(dx) / dt);
+      const maxDv = GUN_ACCEL * dt;
+      g.vx += clamp(desired - g.vx, -maxDv, maxDv);
+      g.x += g.vx * dt;
+    }
     if (g.x < GUN_MIN_X) { g.x = GUN_MIN_X; g.vx = 0; }
     if (g.x > GUN_MAX_X) { g.x = GUN_MAX_X; g.vx = 0; }
     for (let i = 0; i < 3; i++) g.kick[i] = Math.max(0, g.kick[i] - dt * 12);

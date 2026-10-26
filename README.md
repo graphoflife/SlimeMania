@@ -27,13 +27,18 @@ Progress is saved in the browser (localStorage).
 
 ## The numbers
 
-- Every weapon level adds +5% DPS. The first 30 upgrades also shorten the pulse interval down to
-  50%. After that only damage grows.
+- All weapons share one ladder of levels. DPS and upgrade cost depend only on where a weapon stands
+  on that ladder, so two weapons whose next upgrade costs about the same deal about the same DPS.
+- Buying a weapon costs exactly the price of its first level on the ladder. Its level 2 costs the
+  next, more expensive step. So a freshly bought weapon is as strong as an old one upgraded to that
+  price.
+- Every step adds +5% DPS. The first 30 upgrades of each weapon also shorten its pulse interval
+  down to 50%. After that only damage grows.
 - Slime HP doubles every level. A big slime has 18 HP on level 1, a medium one 1/3 of that and a
   small one 1/9.
 - You earn exactly the HP of every slime you kill, so income is roughly your DPS.
-- Upgrade costs grow about 5.07% per level. Weapon prices are spaced so that the next weapon
-  takes about 5 minutes of play at the start and about 10 minutes for the last one (~3.6 h total).
+- Each weapon's entry step is placed so that the next weapon takes about 5 minutes of play at the
+  start and about 10 minutes for the last one (~3.6 h total).
 - Numbers use steps of 1000: K, M, G, T, P, E, Z, Y, R, Q (10^30). After that, KQ, MQ and so on.
 
 All weapons are the same "class": a set of numbers (pulse interval, projectiles per pulse, pulse
@@ -55,7 +60,7 @@ Balancing tools (Node 18+):
 
 ```bash
 node tools/balance.mjs --write   # simulate every weapon, write js/balance.js
-node tools/pacing.mjs            # fit weapon prices to the 5 -> 10 minute pacing
+node tools/pacing.mjs --write    # place weapon entry steps for 5 -> 10 minute pacing
 node tools/early.mjs             # check that level 1 is easy and level 2 is not
 ```
 

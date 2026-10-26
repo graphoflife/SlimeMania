@@ -1,11 +1,12 @@
 // Progress is stored in localStorage.
 import { WEAPONS } from './weapons.js';
+import { weaponStart } from './economy.js';
 
 const KEY = 'slimemania.save.v1';
 
 export function freshSave() {
   return {
-    v: 1,
+    v: 2,
     money: 0,
     level: 1,       // level being played
     maxLevel: 1,    // highest unlocked level
@@ -23,7 +24,13 @@ export function loadSave() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return s;
     const d = JSON.parse(raw);
-    if (!d || d.v !== 1) return s;
+    if (!d || (d.v !== 1 && d.v !== 2)) return s;
+    // v1 levels were positions on the old per-weapon curve; v2 weapons enter the shared
+    // ladder higher up, so keep at least the old DPS
+    if (d.v === 1) {
+      d.levels = d.levels.map((l, k) => (k === 0 || l <= 0 ? l : Math.max(1, l - weaponStart(k) + 1)));
+      d.v = 2;
+    }
     Object.assign(s, d);
     // tolerate added weapons in later versions
     while (s.levels.length < WEAPONS.length) s.levels.push(0);
