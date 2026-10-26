@@ -24,7 +24,8 @@ slime hits and pops make sound.
   unlocked level for as long as you like. If a slime reaches the bottom, the level restarts.
 - `E` / `Tab` opens the Armory on desktop, `Esc` closes it.
 
-Progress is saved in the browser (localStorage).
+Progress is saved in the browser (localStorage). The RESET GAME button at the bottom of the Armory
+wipes it and starts over (after a confirmation).
 
 ## The numbers
 
@@ -73,7 +74,9 @@ node tools/early.mjs             # check that level 1 is easy and level 2 is not
 | `js/weapons.js` | The 30 weapon definitions and the per-level stat builder |
 | `js/economy.js` | DPS, HP, cost and price curves |
 | `js/render.js` | Drawing, effects, chain belt and turret |
-| `js/sprites.js` | Procedural pixel art, rotation cache, slime bodies and faces, tiny font |
+| `js/sprites.js` | Procedural pixel art, rotation cache, slime bodies and faces, hit explosion |
+| `js/projectile-art.js` | Detailed projectile sprites built from shaded signed-distance shapes |
+| `js/pixelart.js` | Canvas and colour helpers |
 | `js/background.js` | Parallax landscape and clouds |
 | `js/audio.js` | Synthesised sound effects (WebAudio) |
 | `js/ui.js` | HUD, banners, Armory |

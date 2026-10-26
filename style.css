@@ -441,7 +441,36 @@ button {
 .upsq.poor .uparrow { border-bottom-color: #5d5875; }
 .upsq.poor .uparrow::after { background: #5d5875; }
 .upsq.poor .cost { color: #fff8; }
-.btn.buy { background: var(--pink); }
+.upsq.buysq { background: var(--pink); }
+.upsq.buysq.poor { background: #7a2242; }
+.list-foot {
+  display: flex;
+  justify-content: center;
+  padding: calc(var(--u) * 14) 0 calc(var(--u) * 8);
+}
+.btn.danger { background: #d0202a; height: calc(var(--u) * 18); padding: 0 calc(var(--u) * 10); }
+#confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  background: #0b0716c0;
+  padding: calc(var(--u) * 12);
+}
+.confirm-box {
+  background: var(--panel);
+  border: calc(var(--u)) solid #000;
+  box-shadow: inset 0 0 0 calc(var(--u)) #d0202a, 0 calc(var(--u) * 3) 0 #000;
+  padding: calc(var(--u) * 10);
+  text-align: center;
+  animation: pop 0.18s steps(6);
+}
+.c-title { font-size: calc(var(--u) * 16); font-weight: 700; color: #ff5a5a; text-shadow: calc(var(--u) * 2) calc(var(--u) * 2) 0 #000; }
+.c-text { margin: calc(var(--u) * 8) 0; line-height: 1.3; color: #fffc; }
+.c-btns { display: flex; justify-content: center; gap: calc(var(--u) * 8); }
+.c-btns .btn { height: calc(var(--u) * 18); min-width: calc(var(--u) * 52); background: #3a5a9a; }
+.c-btns .btn.danger { background: #d0202a; }
 .btn:disabled { background: #4a4560 !important; color: #fff8; cursor: default; }
 .btn.poor { background: #4a4560; color: #fffa; }
 
@@ -453,4 +482,4 @@ button {
   color: #fff9;
   border-top: calc(var(--u)) solid #000;
 }
-.link { color: #fff6; text-decoration: underline; }
+

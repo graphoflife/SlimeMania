@@ -276,13 +276,12 @@ class Game {
     writeSave(this.state);
   }
 
+  // Wipe the save and start over from the title screen.
   resetProgress() {
     clearSave();
     this.state = freshSave();
-    this.ui.closeShop();
-    this.ui.shownMoney = -1;
-    this.startLevel(1);
     writeSave(this.state);
+    location.reload();
   }
 
   // ---------------------------------------------------------------- loop

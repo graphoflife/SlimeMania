@@ -214,10 +214,10 @@ export class Renderer {
     for (let i = 0; i + 3 < tr.length; i += 2) {
       const x0 = tr[i], y0 = tr[i + 1], x1 = tr[i + 2], y1 = tr[i + 3];
       const mx = (x0 + x1) / 2 + (Math.random() * 2 - 1) * 3, my = (y0 + y1) / 2 + (Math.random() * 2 - 1) * 3;
-      pixLine(g, x0, y0, mx, my, '#b89400', 5);
-      pixLine(g, mx, my, x1, y1, '#b89400', 5);
-      pixLine(g, x0, y0, mx, my, '#e8c84a', 2);
-      pixLine(g, mx, my, x1, y1, '#e8c84a', 2);
+      pixLine(g, x0, y0, mx, my, '#ffe23a', 5);
+      pixLine(g, mx, my, x1, y1, '#ffe23a', 5);
+      pixLine(g, x0, y0, mx, my, '#ffffff', 2);
+      pixLine(g, mx, my, x1, y1, '#ffffff', 2);
     }
   }
 

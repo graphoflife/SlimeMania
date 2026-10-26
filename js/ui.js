@@ -3,7 +3,7 @@ import { WEAPONS, shownDps } from './weapons.js';
 import { upgradeCost, weaponPrice, ECON } from './economy.js';
 import { MAX_EQUIPPED } from './config.js';
 import { fmt } from './format.js';
-import { spriteRaw, makeCanvas } from './sprites.js';
+import { sprite, makeCanvas } from './sprites.js';
 import { sfx, upgradeBlip } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
@@ -11,10 +11,10 @@ const $ = (id) => document.getElementById(id);
 function iconCanvas(def, silhouette) {
   const st = def.stages[0];
   const name = Array.isArray(st.sprite) ? st.sprite[0] : st.sprite;
-  const img = spriteRaw(name, st.tints ? st.tints[0] : null);
-  // integer upscale so tiny projectiles still read as icons
-  const k = Math.max(1, Math.floor(12 / Math.max(img.width, img.height)));
-  const S = 14;
+  const img = sprite(name, st.tints ? st.tints[0] : null);
+  // integer upscale so small projectiles still read as icons
+  const S = 24;
+  const k = Math.max(1, Math.floor(22 / Math.max(img.width, img.height)));
   const c = makeCanvas(S, S);
   const g = c.getContext('2d');
   g.imageSmoothingEnabled = false;
@@ -51,9 +51,8 @@ export class UI {
     $('lvPrev').addEventListener('click', () => { sfx('click'); game.setLevel(game.state.level - 1); });
     $('lvNext').addEventListener('click', () => { sfx('click'); game.setLevel(game.state.level + 1); });
     $('btnMute').addEventListener('click', () => game.toggleMute());
-    $('btnReset').addEventListener('click', () => {
-      if (confirm('Reset ALL progress? This cannot be undone.')) game.resetProgress();
-    });
+    $('confirmNo').addEventListener('click', () => { sfx('click'); $('confirm').classList.add('hidden'); });
+    $('confirmYes').addEventListener('click', () => game.resetProgress());
     this.buildShop();
   }
 
@@ -150,7 +149,7 @@ export class UI {
         </div>
         <div class="btns">
           <button class="upsq" aria-label="Upgrade"><span class="uplv"></span><i class="uparrow"></i><span class="cost"></span></button>
-          <button class="btn buy">BUY <span class="price"></span></button>
+          <button class="upsq buysq" aria-label="Buy"><span class="uplv">LV 0</span><i class="uparrow"></i><span class="cost price"></span></button>
         </div>`;
       const card = {
         el, def, i,
@@ -159,9 +158,9 @@ export class UI {
         uplv: el.querySelector('.uplv'),
         desc: el.querySelector('.wdesc'),
         stat: el.querySelector('.wstat'),
-        up: el.querySelector('.upsq'),
+        up: el.querySelector('.upsq:not(.buysq)'),
         cost: el.querySelector('.cost'),
-        buy: el.querySelector('.buy'),
+        buy: el.querySelector('.buysq'),
         price: el.querySelector('.price'),
         iconState: null,
       };
@@ -173,6 +172,11 @@ export class UI {
       this.list.appendChild(el);
       return card;
     });
+    const foot = document.createElement('div');
+    foot.className = 'list-foot';
+    foot.innerHTML = '<button class="btn danger">RESET GAME</button>';
+    foot.firstChild.addEventListener('click', () => { sfx('click'); $('confirm').classList.remove('hidden'); });
+    this.list.appendChild(foot);
   }
 
   bindHold(btn, action) {
@@ -207,7 +211,10 @@ export class UI {
     if (target) this.list.scrollTop = target.el.offsetTop - this.list.offsetTop - 4;
   }
 
-  closeShop() { this.shop.classList.add('hidden'); }
+  closeShop() {
+    this.shop.classList.add('hidden');
+    $('confirm').classList.add('hidden');
+  }
   get shopOpen() { return !this.shop.classList.contains('hidden'); }
 
   refreshShop() {
