@@ -11,6 +11,8 @@ import { slimeScale } from './world.js';
 const TAU = Math.PI * 2;
 // explosions get the hit sprite at a bigger scale: [scale, screen shake]
 const BOOMS = { boom: [2.2, 0.8], boom_s: [1.4, 0.3], bigboom: [3.4, 1.8], nova: [3, 1.4], popcorn: [1.3, 0], bubblepop: [1.1, 0] };
+const NIGHT_TINT = '#101848';
+const NIGHT_TINT_ALPHA = 0.25;
 const PARTY = ['#ff3a7c', '#3ad7ff', '#ffe23a', '#7dff3a', '#c04dff', '#ff8c1a', '#ffffff'];
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -51,10 +53,13 @@ export class Renderer {
 
   // extra rows of sky above the playfield on tall screens
   setExtra(extra) {
-    if (extra === this.extra && this.canvas.height === H + extra + BOTTOM_BAR) return;
+    if (extra === this.extra && this.canvas.height === H + extra + BOTTOM_BAR && this.fg) return;
     this.extra = extra;
     this.canvas.height = H + extra + BOTTOM_BAR;
     this.g.imageSmoothingEnabled = false;
+    // everything in front of the landscape is drawn on its own layer (for the night tint)
+    this.fg = makeCanvas(W, this.canvas.height);
+    this.fg.getContext('2d').imageSmoothingEnabled = false;
   }
 
   reset() {
@@ -147,10 +152,15 @@ export class Renderer {
 
   // ---------------------------------------------------------------- drawing
   draw(world, opts = {}) {
-    const g = this.g;
+    if (!this.fg) this.setExtra(this.extra);
+    const main = this.g;
     const ex = this.extra;
+    main.setTransform(1, 0, 0, 1, 0, 0);
+    this.bg.draw(main, ex, this.night);
+    // the foreground goes onto its own layer, all drawing helpers use this.g
+    const g = (this.g = this.fg.getContext('2d'));
     g.setTransform(1, 0, 0, 1, 0, 0);
-    this.bg.draw(g, ex, this.night);
+    g.clearRect(0, 0, W, this.fg.height);
     const sx = Math.round((Math.random() * 2 - 1) * this.shake);
     const sy = Math.round((Math.random() * 2 - 1) * this.shake);
     g.setTransform(1, 0, 0, 1, sx, sy + ex);
@@ -171,17 +181,28 @@ export class Renderer {
     this.drawProjectiles(world);
     this.drawEffects();
     g.setTransform(1, 0, 0, 1, 0, 0);
-    if (this.flash > 0) {
-      g.globalAlpha = this.flash * 0.45;
-      g.fillStyle = this.flashColor;
-      g.fillRect(0, 0, W, this.canvas.height);
+    if (this.night > 0) {
+      // at night everything in front gets a slightly darker, bluish moonlight tint
+      g.globalCompositeOperation = 'source-atop';
+      g.globalAlpha = NIGHT_TINT_ALPHA * this.night;
+      g.fillStyle = NIGHT_TINT;
+      g.fillRect(0, 0, W, this.fg.height);
       g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
+    this.g = main;
+    main.drawImage(this.fg, 0, 0);
+    if (this.flash > 0) {
+      main.globalAlpha = this.flash * 0.45;
+      main.fillStyle = this.flashColor;
+      main.fillRect(0, 0, W, this.canvas.height);
+      main.globalAlpha = 1;
     }
     if (opts.dim) {
-      g.globalAlpha = opts.dim;
-      g.fillStyle = '#140f24';
-      g.fillRect(0, 0, W, this.canvas.height);
-      g.globalAlpha = 1;
+      main.globalAlpha = opts.dim;
+      main.fillStyle = '#140f24';
+      main.fillRect(0, 0, W, this.canvas.height);
+      main.globalAlpha = 1;
     }
   }
 
