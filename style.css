@@ -349,6 +349,7 @@ button {
 .slot canvas { width: calc(var(--u) * 14); height: calc(var(--u) * 14); }
 
 .shop-list {
+  position: relative; /* cards' offsetTop is measured from the list */
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;

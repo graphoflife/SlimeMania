@@ -205,10 +205,11 @@ export class UI {
   openShop() {
     this.shop.classList.remove('hidden');
     this.refreshShop();
-    // scroll the "next weapon" card into view
-    const next = this.nextWeapon();
-    const target = this.cards[next >= 0 ? Math.max(0, next - 1) : WEAPONS.length - 1];
-    if (target) this.list.scrollTop = target.el.offsetTop - this.list.offsetTop - 4;
+    // start with the lowest equipped weapon of the list at the bottom of the view
+    // (layout offsets, not screen rects: the shop pops in with a scale animation)
+    const card = this.cards[Math.max(...this.game.state.equipped)].el;
+    const gap = card.offsetHeight * 0.15;
+    this.list.scrollTop = Math.max(0, card.offsetTop + card.offsetHeight + gap - this.list.clientHeight);
   }
 
   closeShop() {
