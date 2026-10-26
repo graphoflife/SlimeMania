@@ -71,22 +71,52 @@ function buildCloud(rng) {
   return c;
 }
 
+// Snowy mountains, lower than the sky line. Every summit has a ridge running down from it:
+// the face left of the ridge catches the light, the face right of it is in shade.
 function buildMountains(rng) {
-  const top0 = 180, hgt = 180;
+  const top0 = 210, hgt = 150;
   const c = makeCanvas(TILE, hgt);
   const g = c.getContext('2d');
   const n1 = pnoise(5, rng), n2 = pnoise(11, rng), n3 = pnoise(36, rng), ns = pnoise(60, rng);
   const ridge = (f) => 1 - Math.abs(2 * f - 1);
-  const top = (x) => 300 - (0.62 * ridge(n1(x)) + 0.28 * ridge(n2(x)) + 0.1 * n3(x)) * 100;
+  const top = (x) => 304 - (0.62 * ridge(n1(x)) + 0.28 * ridge(n2(x)) + 0.1 * n3(x)) * 72;
   const rock = fade('#8b8fc0', 0.42), rockD = fade('#6f72a6', 0.42);
   const snow = fade('#ffffff', 0.15), snowD = fade('#c6d2ee', 0.25);
+
+  // profile over three tiles so summits near the seam are handled like any other
+  const xs = [];
+  for (let x = -TILE; x < 2 * TILE; x++) xs.push(top(x));
+  const at = (x) => xs[x + TILE];
+  const peaks = [];
+  for (let x = -TILE + 8; x < 2 * TILE - 8; x++) {
+    let best = true;
+    for (let d = -8; d <= 8 && best; d++) if (d && at(x + d) < at(x)) best = false;
+    if (best && (!peaks.length || x - peaks[peaks.length - 1].x > 8)) {
+      peaks.push({ x, y: at(x), slant: rng.range(-0.35, 0.35), ph: rng.range(0, 6.3) });
+    }
+  }
+  // valleys between summits; the border below a valley is slanted too (one mountain in front)
+  const valleys = [];
+  for (let k = 0; k + 1 < peaks.length; k++) {
+    let v = peaks[k].x;
+    for (let x = peaks[k].x; x <= peaks[k + 1].x; x++) if (at(x) >= at(v)) v = x;
+    valleys.push({ x: v, y: at(v), slant: rng.range(-0.3, 0.3) });
+  }
+  const ownerAt = (x, y) => {
+    let k = 0;
+    while (k < valleys.length && x >= valleys[k].x + Math.max(0, y - valleys[k].y) * valleys[k].slant) k++;
+    return peaks[k];
+  };
   for (let x = 0; x < TILE; x++) {
-    const t = Math.round(top(x));
-    const lit = top(x + 2) < top(x - 2);
-    const snowLine = 236 + ns(x) * 12;
+    const t = Math.round(at(x));
+    const snowLine = 262 + ns(x) * 8;
     for (let y = t; y < top0 + hgt; y++) {
+      const p = ownerAt(x, y);
+      // ridge line: from the summit down, slightly slanted and wobbly
+      const rx = p.x + (y - p.y) * p.slant + Math.round(Math.sin(y * 0.35 + p.ph) * 1.2);
+      const lit = x < rx;
       let col = lit ? rock : rockD;
-      if (y < snowLine && y < t + 16 + ns(x * 3) * 6) col = lit ? snow : snowD;
+      if (y < snowLine && y < t + 12 + ns(x * 3) * 6) col = lit ? snow : snowD;
       g.fillStyle = col;
       g.fillRect(x, y - top0, 1, 1);
     }

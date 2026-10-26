@@ -1,7 +1,7 @@
 // The game simulation: gun, slimes, waves, projectiles, hits.
 // Pure logic without DOM access, so tools/*.mjs can run it headless in Node.
 import {
-  W, H, SLIME_R, MUZZLE_Y, LOSE_Y, SPAWN_Y, GUN_MIN_X, GUN_MAX_X,
+  W, H, SLIME_R, MUZZLE_Y, LOSE_Y, GUN_MIN_X, GUN_MAX_X,
   GUN_MAX_SPEED, GUN_ACCEL, SLOT_OFFSETS,
 } from './config.js';
 
@@ -17,13 +17,15 @@ const DOWN = Math.PI / 2;
 const MAX_FACE_DEV = 50 * DEG;   // how far a slime may look away from its travel direction
 const MAX_KICK = 70 * DEG;       // extra rotation hits can add on top of that
 const MAX_UP_DEV = 80 * DEG;     // every projectile flies upwards, at most this far from vertical
-const SPEED_MUL = [1, 1.08, 1.16];
+const SPEED_MUL = [0.87, 0.94, 1.01];  // drift speed per size (~28 s from the top to the bottom)
+// Big slimes grow in at the very top of the screen. On tall screens the view reaches above
+// the playfield (topY < 0); slimes then drift faster so the way down takes just as long.
+const BASE_PATH = LOSE_Y - 2 * SLIME_R[0] - 4;
 const STEER = 1.4;               // how quickly a slime eases into its new drift (1/s)
 const KICK_DAMP = 3;             // how quickly recoil fades (1/s)
 const GROW_T = 0.5;              // spawn: grow from nothing
 const CHILD_GROW_T = 0.2;        // children grow from CHILD_G0 to full size
 const CHILD_G0 = 0.55;
-const MIN_Y = 8;                 // slimes never get pushed above this
 const INTERMISSION = 2.2;        // pause between waves
 const FF_GAP = 0.35;             // empty field: next slime arrives after at most this
 const CELL = 24;
@@ -106,6 +108,7 @@ export class World {
     this.gun = { x: W / 2, vx: 0, targetX: W / 2, kick: [0, 0, 0] };
     this.grid = Array.from({ length: COLS }, () => []);
     this.stamp = 0;
+    this.topY = 0; // top edge of the visible sky, set by the game on tall screens
     this.nextId = 1;
     this.loadLevel(1, 18);
   }
@@ -215,15 +218,17 @@ export class World {
   fire(em, i, n) {
     const st = em.st;
     const rng = this.rng;
-    let a;
+    let a, tint = null;
     if ((st.fan || st.sweep) && n > 1) {
-      const k = (2 * i) / (n - 1) - 1;
-      a = st.angle.mean + st.angle.spread * (st.sweep && em.back ? -k : k) + rng.range(-1.5, 1.5);
+      // fan position from the left; a sweep runs back from the right every other pulse
+      const pos = st.sweep && em.back ? n - 1 - i : i;
+      a = st.angle.mean + st.angle.spread * ((2 * pos) / (n - 1) - 1) + (st.sweep ? 0 : rng.range(-1.5, 1.5));
+      if (st.tintByFan) tint = st.stages[0].tints[pos % st.stages[0].tints.length];
     } else a = sample(st.angle, rng);
     const v = Math.max(20, sample(st.speed, rng));
     const rad = UP + a * DEG;
     const x = this.gun.x + SLOT_OFFSETS[em.slot];
-    this.spawnProj(st, 0, x, MUZZLE_Y, rad, v, -1, null);
+    this.spawnProj(st, 0, x, MUZZLE_Y, rad, v, -1, tint);
     this.gun.kick[em.slot] = 1;
   }
 
@@ -288,7 +293,7 @@ export class World {
   }
 
   spawnFromWave(i) {
-    const s = this.makeSlime(0, WAVE[i].x, SPAWN_Y, this.bigHp, WAVE[i].type);
+    const s = this.makeSlime(0, WAVE[i].x, this.topY + SLIME_R[0] + 4, this.bigHp, WAVE[i].type);
     s.sqv = -2;
     this.slimes.push(s);
     this.ev('spawn', { x: s.x, y: s.y });
@@ -305,7 +310,7 @@ export class World {
     else { ang = DOWN + rng.range(-0.8, 0.8); spd = rng.range(1, 4); }                               // dawdle
     const c = Math.cos(ang);
     if ((s.x < minX(s) + 10 && c < 0) || (s.x > maxX(s) - 10 && c > 0)) ang = Math.PI - ang;
-    spd *= SPEED_MUL[s.size];
+    spd *= SPEED_MUL[s.size] * ((BASE_PATH - this.topY) / BASE_PATH);
     s.tvx = Math.cos(ang) * spd;
     s.tvy = Math.sin(ang) * spd;
     s.faceTarget = ang + rng.range(-0.45, 0.45);
@@ -329,7 +334,7 @@ export class World {
       s.y += (s.vy + s.ky) * dt;
       if (s.x < minX(s)) { s.x = minX(s); s.kx = Math.abs(s.kx) * 0.5; if (s.tvx < 0) s.tvx = -s.tvx; }
       else if (s.x > maxX(s)) { s.x = maxX(s); s.kx = -Math.abs(s.kx) * 0.5; if (s.tvx > 0) s.tvx = -s.tvx; }
-      if (s.y < MIN_Y) { s.y = MIN_Y; if (s.ky < 0) s.ky = 0; }
+      if (s.y < this.topY + s.r + 4) { s.y = this.topY + s.r + 4; if (s.ky < 0) s.ky = 0; } // never pushed off the top
       // facing: follows the travel direction, but never looks too far off
       s.heading = Math.atan2(s.vy, s.vx);
       s.face += angDiff(s.faceTarget, s.face) * faceK;
@@ -395,7 +400,7 @@ export class World {
       if (p.rest > 0) p.rest -= dt;
       if (p.rest <= 0) this.collide(p, px, py);
       if (p.dead) continue;
-      if (p.x < -16 || p.x > W + 16 || p.y < -130 || p.y > H + 16) p.dead = true;
+      if (p.x < -16 || p.x > W + 16 || p.y < this.topY - 40 || p.y > H + 16) p.dead = true;
     }
   }
 

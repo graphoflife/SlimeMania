@@ -6,7 +6,8 @@
 //   pulse     pulse length; the projectiles are emitted evenly over it (range)
 //   speed     projectile speed in px/s       (range; every projectile is fast)
 //   angle     launch angle in degrees, 0 = straight up (range). fan: spread evenly.
-//             sweep: a fan that keeps sweeping back and forth (the pulse fills the interval)
+//             sweep: a fan that goes left to right, then back right to left, without a break
+//             (the pulse fills the interval). tintByFan: colour each shot by its fan position.
 //
 // Stage parameters (stage 0 = the projectile, 1 = sub projectiles, 2 = sub-sub)
 //   share     fraction of the total damage carried by this stage
@@ -14,7 +15,7 @@
 //   rest      resting time between two hits
 //   recoil    push on the slime per hit (px/s for a big slime)
 //   rotKick   max random instant rotation of the slime per hit (degrees)
-//   trail     tail look: bolt | laser | wind | staff | fire | rainbow | sparkle | smoke (trailLen px)
+//   trail     tail look: bolt | laser | wind | staff | fire | tint | sparkle | smoke (trailLen px)
 //   split     sub projectiles released where the last hit lands:
 //             { count, mode: 'burst' (spread around straight up) | 'cone' | 'fan' (around the
 //               parent), angle, speed | speedFactor, tint, fx (explosion look) }
@@ -34,6 +35,8 @@ const N = (mean, spread) => ({ mean, spread, dist: 'n' });
 
 export const TINTS = {
   party: ['#ff3a7c', '#3ad7ff', '#ffe23a', '#7dff3a', '#c04dff', '#ff8c1a'],
+  // pastel rainbow, from the left of the fan to the right
+  pastel: ['#ff8f9f', '#ffc27a', '#fff27a', '#93ec93', '#8cc8ff', '#c99cff'],
 };
 
 export const WEAPONS = [
@@ -74,10 +77,11 @@ export const WEAPONS = [
     stages: [{ sprite: 'leaf', orient: 'spin', spin: [6, 12], hits: 2, rest: 0.04, recoil: 1, rotKick: 20 }],
   },
   {
-    id: 'laser', name: 'Laser', desc: 'Pew pew. Fifteen hits per beam.',
-    interval: U(0.4, 0.05), count: 3, pulse: U(0.12, 0.02),
-    speed: U(1200), angle: U(0, 1),
-    stages: [{ sprite: 'laser', trail: 'laser', trailLen: 30, hits: 15, rest: 0.017, recoil: 1, rotKick: 5 }],
+    id: 'laser', name: 'Laser', desc: 'One long, solid beam that pierces everything.',
+    // many short segments back to back: their tails overlap into one continuous beam
+    interval: U(0.45, 0.05), count: 8, pulse: U(0.16), angle: U(0),
+    speed: U(1200),
+    stages: [{ sprite: 'laser', trail: 'laser', trailLen: 32, hits: 15, rest: 0.017, recoil: 1, rotKick: 5 }],
   },
   {
     id: 'bomb', name: 'Small Bomb', desc: 'A bomb that bursts into shrapnel.',
@@ -97,7 +101,7 @@ export const WEAPONS = [
   },
   {
     id: 'daggers', name: 'Daggers', desc: 'A never-ending fan of blades, sweeping back and forth.',
-    interval: U(0.55, 0.02), count: 5, pulse: U(0), sweep: true,
+    interval: U(0.55), count: 5, pulse: U(0), sweep: true,
     speed: U(840, 30), angle: U(0, 16),
     stages: [{ sprite: 'dagger', recoil: 2.7, rotKick: 10 }],
   },
@@ -246,10 +250,10 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'rainbow', name: 'Rainbow', desc: 'A super fast fan of pastel rainbows, sweeping back and forth.',
-    interval: U(0.2, 0.01), count: 6, pulse: U(0), sweep: true,
-    speed: U(840), angle: U(0, 22),
-    stages: [{ sprite: 'rainbow', trail: 'rainbow', trailLen: 24, hits: 3, rest: 0.03, recoil: 1.3, rotKick: 8 }],
+    id: 'rainbow', name: 'Rainbow', desc: 'A super fast fan, back and forth: together the shots paint a rainbow.',
+    interval: U(0.2), count: 6, pulse: U(0), sweep: true, tintByFan: true,
+    speed: U(840), angle: U(0, 12),
+    stages: [{ sprite: 'rainbow', tints: TINTS.pastel, trail: 'tint', trailLen: 42, hits: 3, rest: 0.03, recoil: 1.3, rotKick: 8 }],
   },
   {
     id: 'nova', name: 'Supernova', desc: 'A star that explodes into stars that explode.',
@@ -307,7 +311,7 @@ export function buildStats(def, level, nominalDps) {
   });
   return {
     id: def.id, def, level, dps, interval, pulse, stages,
-    count: def.count, speed: def.speed, angle: def.angle, fan: def.fan,
+    count: def.count, speed: def.speed, angle: def.angle, fan: def.fan, sweep: def.sweep, tintByFan: def.tintByFan,
   };
 }
 

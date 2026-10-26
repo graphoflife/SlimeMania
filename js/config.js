@@ -28,5 +28,4 @@ export const MAX_EQUIPPED = 3;
 // A slime whose bottom edge reaches this line (top of the belt housing) has reached the
 // bottom: level lost.
 export const LOSE_Y = 350;
-// Big slimes grow into existence here (centre y).
-export const SPAWN_Y = 18;
+

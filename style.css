@@ -190,31 +190,22 @@ button {
 }
 
 /* money gained, floating out from under the money counter */
-/* money gained floats just above the money counter, newest closest to it */
-#gains {
+/* money gained: one running number right above the money counter, under the chain */
+#gain {
   position: absolute;
-  left: calc(var(--u) * 8);
-  bottom: calc(var(--u) * 54);
-  display: flex;
-  flex-direction: column-reverse;
-  gap: calc(var(--u) * 1);
-  pointer-events: none;
-}
-.gain {
+  left: calc(var(--u) * 10);
+  bottom: calc(var(--u) * 27);
   font-weight: 700;
   color: var(--hi);
   white-space: nowrap;
-  transform-origin: left center;
-  animation: gain 1.1s steps(22) forwards;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s steps(3);
   text-shadow: calc(var(--u)) 0 0 #000, calc(var(--u) * -1) 0 0 #000, 0 calc(var(--u)) 0 #000, 0 calc(var(--u) * -1) 0 #000;
 }
-.gain.big { color: #fff; }
-@keyframes gain {
-  0% { transform: scale(1.4); opacity: 0; }
-  10% { transform: scale(1); opacity: 1; }
-  65% { opacity: 1; }
-  100% { opacity: 0; }
-}
+#gain.show { opacity: 1; transition: none; }
+#gain.bump { animation: gainBump 0.12s steps(3); }
+@keyframes gainBump { 0% { transform: scale(1.25); } }
 
 /* ------------------------------------------------------------------ banner */
 #banner {

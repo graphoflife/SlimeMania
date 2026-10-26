@@ -3,7 +3,6 @@ import {
   W, H, BOTTOM_BAR, CHAIN_Y, SPROCKET_R, SPROCKET_LX, SPROCKET_RX, MUZZLE_Y, LOSE_Y, SLOT_OFFSETS,
 } from './config.js';
 import { Background } from './background.js';
-import { PASTEL } from './projectile-art.js';
 import {
   sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas,
 } from './sprites.js';
@@ -244,8 +243,9 @@ export class Renderer {
         pixLine(g, x1, y1, ...at(1), '#ff2a3c', 3);
         pixLine(g, x1, y1, ...at(1), '#ffd0d6', 1);
         break;
-      case 'rainbow':
-        for (let i = 0; i < 6; i++) line(0.1, 1, (i - 2.5) * 1.1, PASTEL[i], 1);
+      case 'tint':
+        pixLine(g, x1, y1, ...at(1), p.tint || '#ffffff', 5);
+        pixLine(g, x1, y1, ...at(0.6), '#ffffff', 1);
         break;
       case 'staff':
         g.globalAlpha = 0.8;

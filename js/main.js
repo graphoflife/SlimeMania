@@ -73,6 +73,7 @@ class Game {
     document.documentElement.style.setProperty('--u', u + 'px');
     document.documentElement.style.setProperty('--gh', base + extra);
     this.renderer.setExtra(extra);
+    this.world.topY = -extra;
   }
 
   toGameX(clientX) {
@@ -183,7 +184,7 @@ class Game {
         case 'pop':
           this.state.money += e.value;
           this.state.kills++;
-          this.ui.addGain(e.value, e.size === 0);
+          this.ui.addGain(e.value);
           sfx('pop' + e.size);
           if (e.size === 0) this.ui.bumpMoney();
           break;

@@ -40,10 +40,9 @@ export class UI {
     this.list = $('shopList');
     this.banner = $('banner');
     this.bannerUntil = 0;
-    this.gains = $('gains');
-    this.gainAcc = 0;
-    this.gainBig = false;
-    this.gainT = 0;
+    this.gain = $('gain');
+    this.gainSum = 0;
+    this.gainIdle = 0;
 
     $('btnShop').addEventListener('click', () => { sfx('click'); game.openShop(); });
     $('shopClose').addEventListener('click', () => { sfx('click'); game.closeShop(); });
@@ -60,23 +59,25 @@ export class UI {
 
   // ---------------------------------------------------------------- HUD
   // money from kills is collected for a moment, then shown under the money counter
-  addGain(value, big) {
-    this.gainAcc += value;
-    this.gainBig ||= big;
+  // One number right above the money counter: the running total of the current killing
+  // streak. It resets after a short pause without kills and then fades out.
+  addGain(value) {
+    if (this.gainIdle > 0.8) this.gainSum = 0;
+    this.gainSum += value;
+    this.gainIdle = 0;
+    this.gainDirty = true;
   }
 
   flushGains(dt) {
-    this.gainT -= dt;
-    if (this.gainT > 0 || this.gainAcc <= 0) return;
-    this.gainT = 0.12;
-    const el = document.createElement('div');
-    el.className = 'gain' + (this.gainBig ? ' big' : '');
-    el.textContent = '+' + fmt(this.gainAcc);
-    el.addEventListener('animationend', () => el.remove());
-    this.gains.prepend(el); // newest right under the money counter
-    while (this.gains.childElementCount > 5) this.gains.lastElementChild.remove();
-    this.gainAcc = 0;
-    this.gainBig = false;
+    this.gainIdle += dt;
+    if (this.gainDirty) {
+      this.gainDirty = false;
+      this.gain.textContent = '+' + fmt(this.gainSum);
+      this.gain.classList.remove('bump');
+      void this.gain.offsetWidth;
+      this.gain.classList.add('bump');
+    }
+    this.gain.classList.toggle('show', this.gainIdle < 0.8);
   }
 
   tick(dt) {

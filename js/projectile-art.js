@@ -174,10 +174,6 @@ function sawArt(d, teethN) {
     .shape(cut(ring(c, c, c * 0.45, 0.5), hole), flat('#8f99ab'));
 }
 
-// pastel rainbow, in this order across the projectile
-const PASTEL = ['#fff59a', '#ffcc8a', '#ff9aa8', '#a8f0a8', '#9ad0ff', '#d4a8ff'];
-export { PASTEL };
-
 const DEFS = {
   // a small black slug: round nose, tapered tail
   bullet: () => A(7, 12)
@@ -298,8 +294,8 @@ const DEFS = {
   bubble_s: () => A(5, 5)
     .shape(ring(2.5, 2.5, 1.6, 0.55), P('#7fe8ff', '#ffffff', '#2aa8d8', '#0a4a7a')),
 
-  rainbow: () => A(8, 13)
-    .shape(seg(4, 4, 4, 9, 3.3), { paint: (x) => PASTEL[clamp(Math.floor(x - 1), 0, 5)], line: '#5a5070' })
+  rainbow: (t) => A(7, 12)
+    .shape(seg(3.5, 3.5, 3.5, 8.5, 2.8), P(t, mix(t, '#ffffff', 0.6), mix(t, '#000000', 0.15), mix(t, '#000000', 0.55)))
     .dots([[2, 2], [2, 3]], '#ffffff'),
 
   saw: () => sawArt(19, 12),
