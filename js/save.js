@@ -1,6 +1,6 @@
 // Progress is stored in localStorage.
 import { WEAPONS } from './weapons.js';
-import { weaponStart } from './economy.js';
+import { weaponStart, effDps, slimeHp, levelCost } from './economy.js';
 
 const KEY = 'slimemania.save.v1';
 
@@ -38,6 +38,27 @@ export function loadSave() {
     if (!s.equipped.length) s.equipped = [0];
     if (!isFinite(s.money) || s.money < 0) s.money = 0;
   } catch { /* corrupted or blocked storage: start fresh */ }
+  return s;
+}
+
+// Test save (?testall): every weapon owned and on the same rung of the cost ladder as the
+// last weapon at level 30, so they all deal the same DPS (Dollar Bills still 30%).
+// Starts on a level one weapon clears comfortably; unlocked up to what three can clear.
+export function testAllSave() {
+  const s = freshSave();
+  const last = WEAPONS.length - 1;
+  const eff = weaponStart(last) + 29;
+  s.levels = WEAPONS.map((_, k) => eff - weaponStart(k) + 1);
+  s.equipped = [last, last - 1, last - 2];
+  const beatable = (dps, margin) => {
+    let L = 1;
+    while (dps >= margin * 1.4 * slimeHp(L + 1)) L++;
+    return L;
+  };
+  s.level = beatable(effDps(eff), 2);
+  s.maxLevel = beatable(3 * effDps(eff), 1);
+  s.money = levelCost(eff + 1) * 100;
+  s.hinted = true;
   return s;
 }
 

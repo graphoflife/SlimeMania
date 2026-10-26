@@ -56,7 +56,11 @@ No build step. Serve the folder with any static server:
 python3 tools/serve.py 8080
 ```
 
-Then open http://localhost:8080. `?autoplay` lets the autopilot play, which is useful for testing.
+Then open http://localhost:8080. Testing helpers:
+
+- `?autoplay` lets the autopilot play.
+- `?testall` replaces the save with every weapon unlocked at equal DPS (the last weapon at level 30)
+  and jumps to a matching level. The parameter is removed from the address after loading.
 
 Balancing tools (Node 18+):
 

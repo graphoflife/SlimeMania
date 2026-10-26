@@ -6,7 +6,7 @@ import { WEAPONS, buildStats } from './weapons.js';
 import { slimeHp, upgradeCost, weaponPrice } from './economy.js';
 import { Renderer, randomSlimeColors } from './render.js';
 import { UI } from './ui.js';
-import { loadSave, writeSave, clearSave, freshSave } from './save.js';
+import { loadSave, writeSave, clearSave, freshSave, testAllSave } from './save.js';
 import { initAudio, sfx, setMuted, suspendAudio, resumeAudio } from './audio.js';
 import { botUpdate } from './bot.js';
 import { fmt } from './format.js';
@@ -21,10 +21,17 @@ class Game {
     this.root = document.getElementById('game');
     this.renderer = new Renderer(this.canvas);
     this.world = new World(new RNG());
+    const params = new URLSearchParams(location.search);
+    if (params.has('testall')) {
+      // build the test save once, then drop the parameter so a reload keeps playing it
+      writeSave(testAllSave());
+      params.delete('testall');
+      history.replaceState(null, '', location.pathname + (params.size ? '?' + params : '') + location.hash);
+    }
     this.state = loadSave();
     this.mode = 'title';
     this.bot = { aimNoise: 6 };
-    this.autoplay = new URLSearchParams(location.search).has('autoplay'); // for testing
+    this.autoplay = params.has('autoplay'); // for testing
     this.keys = { left: false, right: false };
     this.drag = null;
     this.loseT = 0;

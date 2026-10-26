@@ -403,8 +403,9 @@ button {
 .btns .btn { height: calc(var(--u) * 13); font-size: calc(var(--u) * 8); min-width: calc(var(--u) * 46); }
 /* square upgrade button: level, green arrow (if affordable), cost */
 .upsq {
-  width: calc(var(--u) * 40);
-  height: calc(var(--u) * 40);
+  width: calc(var(--u) * 46);
+  height: calc(var(--u) * 46);
+  white-space: nowrap;
   display: flex;
   flex-direction: column;
   align-items: center;
