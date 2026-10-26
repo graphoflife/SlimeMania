@@ -21,24 +21,27 @@ function pnoise(n, rng) {
 const HAZE = '#d9eef6';
 const fade = (c, t = 0.45) => mix(c, HAZE, t);
 
-function bayer(x, y) {
-  const m = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
-  return m[y & 3][x & 3] / 16;
-}
-
 // Covers the playfield plus MAX_EXTRA rows above it (y from -MAX_EXTRA to H).
-function buildSky() {
+// Flat bands of blue with sharp, gently wavy boundaries.
+function buildSky(rng) {
   const c = makeCanvas(W, H + MAX_EXTRA);
   const g = c.getContext('2d');
   const stops = ['#62afe6', '#70baeb', '#7fc4ee', '#93cff1', '#a8d9f3', '#bde3f5', '#cfeaf6', '#dcf0f7'];
-  const bandH = (260 + MAX_EXTRA) / (stops.length - 1);
-  for (let y = 0; y < H + MAX_EXTRA; y++) {
-    const f = Math.min(stops.length - 1.001, y / bandH);
-    const i = Math.floor(f);
-    const t = f - i;
-    for (let x = 0; x < W; x++) {
-      g.fillStyle = t > bayer(x, y) ? stops[i + 1] : stops[i];
-      g.fillRect(x, y, 1, 1);
+  const bandH = (260 + MAX_EXTRA) / stops.length;
+  const waves = stops.slice(1).map((_, k) => ({
+    y: (k + 1) * bandH,
+    a1: rng.range(2, 4), f1: rng.int(1, 3), p1: rng.range(0, Math.PI * 2),
+    a2: rng.range(0.8, 1.6), f2: rng.int(4, 7), p2: rng.range(0, Math.PI * 2),
+  }));
+  for (let x = 0; x < W; x++) {
+    const ph = (x / W) * Math.PI * 2;
+    let y0 = 0;
+    for (let k = 0; k <= waves.length; k++) {
+      const w = waves[k];
+      const y1 = w ? Math.round(w.y + w.a1 * Math.sin(ph * w.f1 + w.p1) + w.a2 * Math.sin(ph * w.f2 + w.p2)) : H + MAX_EXTRA;
+      g.fillStyle = stops[k];
+      g.fillRect(x, y0, 1, Math.max(0, y1 - y0));
+      y0 = Math.max(y0, y1);
     }
   }
   return c;
@@ -165,7 +168,7 @@ function buildGrass(rng) {
 export class Background {
   constructor() {
     const rng = new RNG(4242);
-    this.sky = buildSky();
+    this.sky = buildSky(new RNG(77)); // own seed: the other layers stay as they were
     this.layers = [
       { ...buildMountains(rng), speed: 3, off: 0 },
       { ...buildHills(rng), speed: 9, off: 0 },

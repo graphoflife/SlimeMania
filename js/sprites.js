@@ -275,16 +275,16 @@ export function slimeBody(color, size, sqi, flash) {
       if (ui * ui + vi * vi > 1) col = '#000000';
       else if (flash) col = '#ffffff';
       else {
-        // clean bands of flat colour, no dithering
-        const shadeT = u * 0.45 + v * 0.75;
-        const hx = u + 0.38, hy = v + 0.42;
-        const hd = hx * hx * 1.3 + hy * hy;
+        // clean bands of flat colour that follow the round body: the lit part is a circle
+        // shifted towards the light (top-left), everything outside it is a shade crescent
+        const lit = (cu, cv, r) => (u - cu) ** 2 + (v - cv) ** 2 <= r * r;
         col = pal.base;
-        if (shadeT > 0.38) col = pal.shade;
-        if (shadeT > 0.68 && d > 0.6) col = pal.deep;
-        if (hd < 0.085) col = pal.light;
+        if (!lit(-0.14, -0.18, 0.92)) col = pal.shade;
+        if (!lit(-0.07, -0.09, 0.98)) col = pal.deep;
+        const hx = u + 0.38, hy = v + 0.42;
+        if (hx * hx * 1.3 + hy * hy < 0.085) col = pal.light;
         const sx = u + 0.5, sy = v + 0.5;
-        if (sx * sx + sy * sy < 0.012) col = pal.spec;
+        if (size < 2 && sx * sx + sy * sy < 0.012) col = pal.spec; // no white dot on the smallest
         if (d > 0.62 && u + v < -0.75 && d < 0.78) col = pal.light; // rim light top-left
       }
       g.fillStyle = col;
@@ -338,12 +338,10 @@ export function slimeFace(size, mode) {
       line(ex - erx, ey + ery * 0.3, ex + erx, ey + ery * 0.3, t);
     } else if (size === 2) {
       ellipse(ex, ey, erx, ery, '#000');
-      dot(ex - erx * 0.5, ey - ery * 0.6, 1, 1, '#fff');
     } else {
       ellipse(ex, ey, erx + 1.2, ery + 1.2, '#000');
       ellipse(ex, ey, erx, ery, '#fff');
       ellipse(ex, ey + ery * 0.32, erx * 0.62, ery * 0.6, '#000'); // pupil looks forward
-      dot(ex - erx * 0.35, ey, size === 0 ? 2 : 1, size === 0 ? 2 : 1, '#fff');
     }
   }
   const my = r * 0.5, mw = r * 0.16;
