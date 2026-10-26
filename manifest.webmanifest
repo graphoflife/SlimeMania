@@ -1,0 +1,14 @@
+{
+  "name": "SlimeMania",
+  "short_name": "SlimeMania",
+  "description": "Pop giant slimes with 30 ridiculous weapons.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#140f24",
+  "theme_color": "#140f24",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#140f24">
+<meta name="description" content="SlimeMania - pop giant slimes with 30 ridiculous weapons. A satisfying pixel shooter for phone and desktop.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SlimeMania</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game">
+  <canvas id="screen" width="216" height="384"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="money" class="pill"><i class="coin"></i><span id="moneyVal">0</span></div>
+    <div id="levelBox">
+      <button id="lvPrev" class="arrow" aria-label="Previous level"><i class="tri left"></i></button>
+      <div id="lvLabel"><div id="lvText">LEVEL 1</div><div id="waveText">WAVE 1</div></div>
+      <button id="lvNext" class="arrow" aria-label="Next level"><i class="tri right"></i></button>
+    </div>
+    <div id="hudRight">
+      <button id="btnShop" class="btn shopBtn" aria-label="Armory">SHOP</button>
+      <button id="btnMute" class="btn icon" aria-label="Sound"><i class="note"></i></button>
+    </div>
+  </div>
+
+  <div id="banner"><div class="b-main"></div><div class="b-sub"></div></div>
+  <div id="hint" class="hidden">&lt; DRAG TO MOVE &gt;</div>
+
+  <div id="shop" class="hidden">
+    <div class="shop-panel">
+      <div class="shop-head">
+        <div class="shop-title">ARMORY</div>
+        <div class="shop-money pill"><i class="coin"></i><span id="shopMoney">0</span></div>
+        <button id="shopClose" class="btn close" aria-label="Close">X</button>
+      </div>
+      <div class="shop-sub"><span>EQUIPPED <b id="eqCount">1/3</b></span><span>TOTAL DPS <b id="totalDps">0</b></span></div>
+      <div class="slots" id="slots"></div>
+      <div class="shop-list" id="shopList"></div>
+      <div class="shop-foot"><span>TAP ▲ TO UPGRADE · HOLD FOR TURBO</span><button id="btnReset" class="link">RESET</button></div>
+    </div>
+  </div>
+
+  <div id="title">
+    <div class="logo" aria-label="SlimeMania">
+      <span style="--c:#ff3a7c">S</span><span style="--c:#ff8c1a">L</span><span style="--c:#ffe23a">I</span><span style="--c:#7dff3a">M</span><span style="--c:#3ad7ff">E</span>
+      <br>
+      <span style="--c:#c04dff">M</span><span style="--c:#ff3a7c">A</span><span style="--c:#ff8c1a">N</span><span style="--c:#ffe23a">I</span><span style="--c:#3ad7ff">A</span>
+    </div>
+    <div class="tap" id="tapText">TAP TO PLAY</div>
+    <div class="credits">30 WEAPONS · ENDLESS LEVELS · PURE POP</div>
+  </div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

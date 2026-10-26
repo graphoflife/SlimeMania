@@ -1,0 +1,12 @@
+{
+  "name": "slimemania",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SlimeMania - a satisfying pixel slime shooter for the browser",
+  "scripts": {
+    "balance": "node tools/balance.mjs",
+    "pacing": "node tools/pacing.mjs",
+    "serve": "python3 tools/serve.py 8080"
+  }
+}

@@ -1,0 +1,67 @@
+# SlimeMania
+
+A small, satisfying pixel-art shooter for the browser, for phones and desktop.
+
+Giant slimes hop down from the sky. Your turret rides a chain belt along the bottom and fires on
+its own. Every slime pops into three smaller ones, and those pop into three tiny ones. Every pop
+pays out its HP as money. Spend the money on 30 weird weapons and exponential upgrades, then push
+to higher levels.
+
+## How to play
+
+- **Move**: drag anywhere (touch), move the mouse, or use the arrow keys / A and D.
+- **Armory**: buy weapons and upgrade them. Tap ▲ for one level, or hold it for turbo upgrades.
+  Up to 3 weapons can be equipped at once.
+- **Levels**: clear the first wave of a level to unlock the next one. You can keep farming any
+  unlocked level for as long as you like. If a slime reaches the bottom, the level restarts.
+- `E` / `Tab` opens the Armory on desktop, `Esc` closes it.
+
+Progress is saved in the browser (localStorage).
+
+## The numbers
+
+- Every weapon level adds +5% DPS. The first 30 upgrades also shorten the pulse interval down to
+  50%. After that only damage grows.
+- Slime HP doubles every level. A big slime has 18 HP on level 1, a medium one 1/3 of that and a
+  small one 1/9.
+- You earn exactly the HP of every slime you kill, so income is roughly your DPS.
+- Upgrade costs grow about 5.07% per level. Weapon prices are spaced so that the next weapon
+  takes about 5 minutes of play at the start and about 10 minutes for the last one (~3.6 h total).
+- Numbers use steps of 1000: K, M, G, T, P, E, Z, Y, R, Q (10^30). After that, KQ, MQ and so on.
+
+All weapons are the same "class": a set of numbers (pulse interval, projectiles per pulse, pulse
+length, speed, angle, damage split, hits per projectile, rest between hits, recoil, rotation kick,
+sub-projectiles and sub-sub-projectiles). They are balanced against each other by simulation, so
+they all have the same power at the same level. The one exception is Dollar Bills, which are a joke.
+
+## Development
+
+No build step. Serve the folder with any static server:
+
+```bash
+python3 tools/serve.py 8080
+```
+
+Then open http://localhost:8080. `?autoplay` lets the autopilot play, which is useful for testing.
+
+Balancing tools (Node 18+):
+
+```bash
+node tools/balance.mjs --write   # simulate every weapon, write js/balance.js
+node tools/pacing.mjs            # fit weapon prices to the 5 -> 10 minute pacing
+node tools/early.mjs             # check that level 1 is easy and level 2 is not
+```
+
+## Code map
+
+| File | What it does |
+| --- | --- |
+| `js/world.js` | Simulation: gun, slimes, waves, projectiles, hits, splitting (no DOM) |
+| `js/weapons.js` | The 30 weapon definitions and the per-level stat builder |
+| `js/economy.js` | DPS, HP, cost and price curves |
+| `js/render.js` | Drawing, effects, chain belt and turret |
+| `js/sprites.js` | Procedural pixel art, rotation cache, slime bodies and faces, tiny font |
+| `js/background.js` | Parallax landscape and clouds |
+| `js/audio.js` | Synthesised sound effects (WebAudio) |
+| `js/ui.js` | HUD, banners, Armory |
+| `js/main.js` | Main loop, input, level flow |
