@@ -1,28 +1,31 @@
 // Draws the world onto the low-res canvas and owns all visual-only effects.
 import {
-  W, H, MAX_EXTRA, CHAIN_Y, SPROCKET_R, SPROCKET_LX, SPROCKET_RX, MUZZLE_Y, LOSE_Y, SLOT_OFFSETS,
+  W, H, CHAIN_Y, SPROCKET_R, SPROCKET_LX, SPROCKET_RX, MUZZLE_Y, LOSE_Y, SLOT_OFFSETS,
 } from './config.js';
 import { Background } from './background.js';
 import {
-  sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, textSprite, makeCanvas, hsv,
+  sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas,
 } from './sprites.js';
-import { fmt } from './format.js';
+import { slimeScale } from './world.js';
 
 const TAU = Math.PI * 2;
 // explosions get the hit sprite at a bigger scale: [scale, screen shake]
 const BOOMS = { boom: [2.2, 0.8], bigboom: [3.4, 1.8], rumble: [2.6, 1.2], nova: [2.8, 1], popcorn: [1.3, 0], bubblepop: [1.1, 0] };
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
-// Bright, saturated slime colours; sometimes black or white.
-export function randomSlimeColors(n, rng = Math.random) {
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const r = rng();
-    if (r < 0.07) out.push('#111111');
-    else if (r < 0.14) out.push('#ffffff');
-    else out.push(hsv(Math.floor(rng() * 24) * 15, 0.78 + rng() * 0.22, 1));
-  }
-  return out;
+// Bright, saturated, clearly different colours (plus black and white).
+const SLIME_COLORS = [
+  '#ff2a3c', '#ff8c1a', '#ffe21a', '#9dff1a', '#1ee05a', '#1ae8e0',
+  '#2f8cff', '#7a3dff', '#d22eff', '#ff3aa8', '#111111', '#ffffff',
+];
+
+// Two slime types per level, each with its own colour for big, medium and small.
+// All six colours are different, so no colour repeats inside a type or between
+// the two types. Returns colors[type][size].
+export function randomSlimeColors(rng = Math.random) {
+  const pool = [...SLIME_COLORS];
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  return [pool.slice(0, 3), pool.slice(3, 6)];
 }
 
 export class Renderer {
@@ -31,11 +34,10 @@ export class Renderer {
     this.g = canvas.getContext('2d');
     this.g.imageSmoothingEnabled = false;
     this.bg = new Background();
-    this.colors = randomSlimeColors(20);
+    this.colors = randomSlimeColors();
     this.hits = [];
     this.rings = [];
     this.parts = [];
-    this.popups = [];
     this.shake = 0;
     this.flash = 0;
     this.flashColor = '#ff2a3c';
@@ -56,7 +58,6 @@ export class Renderer {
     this.hits.length = 0;
     this.rings.length = 0;
     this.parts.length = 0;
-    this.popups.length = 0;
   }
 
   // ---------------------------------------------------------------- events -> effects
@@ -66,10 +67,10 @@ export class Renderer {
         this.hits.push({ x: e.x, y: e.y, t: 0, rot: Math.random() * TAU, sc: 0.8 + Math.random() * 0.4 });
       }
     } else if (e.type === 'pop') {
-      this.burst(e, true);
+      this.burst(e.x, e.y, e.r, e.size, e.kind);
       if (e.size === 0) this.shake = Math.max(this.shake, 1.2);
     } else if (e.type === 'split') {
-      const big = BOOMS[e.sfx];
+      const big = BOOMS[e.fx];
       if (big) {
         this.hits.push({ x: e.x, y: e.y, t: 0, rot: Math.random() * TAU, sc: big[0] });
         this.shake = Math.max(this.shake, big[1]);
@@ -84,25 +85,23 @@ export class Renderer {
     }
   }
 
-  // ring + droplets in the slime colour, optional money popup
-  burst(e, popup) {
-    const color = this.colors[e.color % this.colors.length];
+  colorOf(type, size) { return this.colors[type][size]; }
+
+  // ring + droplets in the slime colour
+  burst(x, y, r, size, kind) {
+    const color = this.colorOf(kind, size);
     const pal = slimePalette(color);
-    this.rings.push({ x: e.x, y: e.y, r: e.r, t: 0, color: pal.light });
-    const n = [16, 10, 7][e.size];
+    this.rings.push({ x, y, r, t: 0, color: pal.light });
+    const n = [16, 10, 7][size];
     for (let i = 0; i < n && this.parts.length < 400; i++) {
       const a = Math.random() * TAU;
-      const v = (40 + Math.random() * 90) * (e.size === 2 ? 1.2 : 1);
+      const v = (40 + Math.random() * 90) * (size === 2 ? 1.2 : 1);
       this.parts.push({
-        x: e.x + Math.cos(a) * e.r * 0.6, y: e.y + Math.sin(a) * e.r * 0.6,
+        x: x + Math.cos(a) * r * 0.6, y: y + Math.sin(a) * r * 0.6,
         vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 0.3 + Math.random() * 0.35,
         color: Math.random() < 0.3 ? pal.light : Math.random() < 0.5 ? pal.shade : pal.base,
         size: Math.random() < 0.3 ? 2 : 1,
       });
-    }
-    if (popup && this.popups.length < 50) {
-      const col = ['#ffe23a', '#fff3a0', '#ffffff'][e.size];
-      this.popups.push({ x: e.x, y: e.y, t: 0, img: textSprite('+' + fmt(e.value), col), life: [1.1, 0.9, 0.7][e.size] });
     }
   }
 
@@ -120,8 +119,6 @@ export class Renderer {
       p.x += p.vx * dt; p.y += p.vy * dt;
     }
     this.parts = this.parts.filter((p) => p.t < p.life);
-    for (const p of this.popups) p.t += dt;
-    this.popups = this.popups.filter((p) => p.t < p.life);
     this.shake = Math.max(0, this.shake - dt * 8);
     this.flash = Math.max(0, this.flash - dt * 2.2);
   }
@@ -138,10 +135,10 @@ export class Renderer {
 
     // danger line when a slime gets close to the bottom
     let lowest = -1e9;
-    for (const s of world.slimes) lowest = Math.max(lowest, s.y);
-    if (lowest > LOSE_Y - 70 && Math.floor(this.time * 6) % 2 === 0) {
+    for (const s of world.slimes) lowest = Math.max(lowest, s.y + s.r);
+    if (lowest > LOSE_Y - 60 && Math.floor(this.time * 6) % 2 === 0) {
       g.fillStyle = '#ff2a3c';
-      for (let x = 0; x < W; x += 6) g.fillRect(x, LOSE_Y, 3, 1);
+      for (let x = 0; x < W; x += 6) g.fillRect(x, LOSE_Y - 2, 3, 2);
     }
 
     this.drawSlimes(world);
@@ -171,13 +168,21 @@ export class Renderer {
     for (let size = 0; size < 3; size++) {
       for (const s of world.slimes) {
         if (s.size !== size) continue;
-        const color = this.colors[s.color % this.colors.length];
         const sqi = clamp(Math.round(s.sq / 0.05) + 2, 0, 4);
-        const body = slimeBody(color, size, sqi, s.flash > 0);
-        g.drawImage(body, Math.round(s.x - body.width / 2), Math.round(s.y - body.height / 2));
+        const body = slimeBody(this.colorOf(s.type, size), size, sqi, s.flash > 0);
         const mode = s.hurt > 0 ? 'hurt' : s.blink < 0 ? 'blink' : 'normal';
         const face = rotated(slimeFace(size, mode), s.face + s.kick - Math.PI / 2);
-        g.drawImage(face, Math.round(s.x - face.width / 2), Math.round(s.y - face.height / 2));
+        const sc = slimeScale(s);
+        if (sc === 1) {
+          g.drawImage(body, Math.round(s.x - body.width / 2), Math.round(s.y - body.height / 2));
+          g.drawImage(face, Math.round(s.x - face.width / 2), Math.round(s.y - face.height / 2));
+        } else if (sc > 0.02) {
+          // growing into existence
+          for (const img of [body, face]) {
+            const w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+            g.drawImage(img, Math.round(s.x - w / 2), Math.round(s.y - h / 2), w, h);
+          }
+        }
       }
     }
   }
@@ -190,7 +195,7 @@ export class Renderer {
       let name = st.sprite;
       if (Array.isArray(name)) {
         let f;
-        if (st.anim === 'life') f = Math.floor((1 - p.life / p.life0) * name.length);
+        if (st.anim === 'age') f = Math.floor(p.age / 0.09);
         else f = Math.floor(p.age * st.anim);
         name = name[clamp(f, 0, name.length - 1) % name.length];
       }
@@ -231,12 +236,6 @@ export class Renderer {
       const img = rotated(hitFrame(f), h.rot);
       const w = Math.round(img.width * h.sc), hh = Math.round(img.height * h.sc);
       g.drawImage(img, Math.round(h.x - w / 2), Math.round(h.y - hh / 2), w, hh);
-    }
-    for (const p of this.popups) {
-      const k = p.t / p.life;
-      g.globalAlpha = k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1;
-      const rise = Math.round(14 * (1 - (1 - k) ** 3));
-      g.drawImage(p.img, Math.round(p.x - p.img.width / 2), Math.round(p.y - 4 - rise));
     }
     g.globalAlpha = 1;
   }

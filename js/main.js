@@ -14,7 +14,6 @@ import { warmJobs } from './sprites.js';
 
 const STEP = 1 / 60;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-const SFX_OF = Object.fromEntries(WEAPONS.map((w) => [w.id, w.sfx]));
 
 class Game {
   constructor() {
@@ -140,7 +139,7 @@ class Game {
     const s = this.state;
     s.level = clamp(L, 1, s.maxLevel);
     this.loseT = 0;
-    this.renderer.colors = randomSlimeColors(20);
+    this.renderer.colors = randomSlimeColors();
     this.renderer.reset();
     this.world.loadLevel(s.level, slimeHp(s.level));
     this.applyLoadout();
@@ -171,12 +170,10 @@ class Game {
         case 'pop':
           this.state.money += e.value;
           this.state.kills++;
+          this.ui.addGain(e.value, e.size === 0);
           sfx('pop' + e.size);
           if (e.size === 0) this.ui.bumpMoney();
           break;
-        case 'shot':
-        case 'pulse': sfx(SFX_OF[e.wid]); break;
-        case 'split': sfx(e.sfx); break;
         case 'waveStart': if (e.n > 1) this.ui.showBanner(`WAVE ${e.n}`, '', '#ffffff', 1.2, true); break;
         case 'waveClear': this.onWaveClear(e); break;
         case 'lose': this.onLose(); break;
@@ -205,7 +202,7 @@ class Game {
     this.ui.showBanner('LEVEL FAILED', 'UPGRADE AND TRY AGAIN!', '#ff3a7c', 2.2);
     this.loseT = 2.2;
     // everything on screen bursts (no money for these)
-    for (const s of this.world.slimes) this.renderer.burst(s, false);
+    for (const s of this.world.slimes) this.renderer.burst(s.x, s.y, s.r, s.size, s.type);
     this.world.slimes.length = 0;
     this.world.projs.length = 0;
     writeSave(this.state);
@@ -293,7 +290,7 @@ class Game {
     if (!paused) {
       if (this.keys.left !== this.keys.right) {
         const g = this.world.gun;
-        g.targetX = clamp(g.x + (this.keys.left ? -40 : 40), GUN_MIN_X, GUN_MAX_X);
+        g.targetX = clamp(g.x + (this.keys.left ? -60 : 60), GUN_MIN_X, GUN_MAX_X);
       }
       this.acc += dt;
       let n = 0;

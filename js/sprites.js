@@ -234,6 +234,7 @@ export function slimePalette(base) {
 }
 
 export const SQUASH = [-0.1, -0.05, 0, 0.05, 0.1];
+export const OUTLINE = 3; // comic outline, the same for every slime size
 const bodyCache = new Map();
 
 // size: 0..2, sqi: index into SQUASH, flash: white silhouette
@@ -244,11 +245,11 @@ export function slimeBody(color, size, sqi, flash) {
   const r = SLIME_R[size];
   const sq = SQUASH[sqi];
   const rx = r * (1 + sq), ry = r / (1 + sq);
-  const dim = Math.ceil(r * 1.25) * 2 + 2;
+  const dim = Math.ceil(r * 1.15) * 2 + 2;
   c = makeCanvas(dim, dim);
   const g = c.getContext('2d');
   const cx = dim / 2, cy = dim / 2;
-  const ol = size === 0 ? 2 : 1;
+  const ol = OUTLINE;
   const pal = slimePalette(color);
   for (let y = 0; y < dim; y++) {
     for (let x = 0; x < dim; x++) {
@@ -268,7 +269,7 @@ export function slimeBody(color, size, sqi, flash) {
         if (hd < 0.07 || (hd < 0.1 && (x + y) % 2 === 0)) col = pal.light;
         const sx = u + 0.5, sy = v + 0.5;
         if (sx * sx + sy * sy < 0.012) col = pal.spec;
-        if (d > 0.72 && u + v < -0.6 && d < 0.86) col = pal.light; // rim light top-left
+        if (d > 0.62 && u + v < -0.75 && d < 0.78) col = pal.light; // rim light top-left
       }
       g.fillStyle = col;
       g.fillRect(x, y, 1, 1);
@@ -278,73 +279,65 @@ export function slimeBody(color, size, sqi, flash) {
   return c;
 }
 
-// Face sprites, drawn facing DOWN; rotated at draw time around the slime centre.
+// Face sprites, drawn facing DOWN and scaled to the slime radius;
+// rotated at draw time around the slime centre. mode: normal | hurt | blink
 const faceBase = new Map();
 export function slimeFace(size, mode) {
   const key = size + mode;
   let c = faceBase.get(key);
   if (c) return c;
   const r = SLIME_R[size];
-  const dim = r * 2 + 2;
+  const dim = Math.ceil(r) * 2 + 2;
   c = makeCanvas(dim, dim);
   const g = c.getContext('2d');
-  const cx = Math.floor(dim / 2), cy = Math.floor(dim / 2);
-  const px = (x, y, col) => { g.fillStyle = col; g.fillRect(cx + x, cy + y, 1, 1); };
-  const rect = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(cx + x, cy + y, w, h); };
-  if (size === 0) {
-    const ey = 4, sep = 6;
-    for (const s of [-1, 1]) {
-      const ex = s * sep;
-      if (mode === 'hurt') {
-        // squeezed eyes: > <
-        const d = -s;
-        for (const o of [0, -d]) {
-          px(ex - 2 * d + o, ey - 2, '#000'); px(ex - d + o, ey - 1, '#000'); px(ex + o, ey, '#000');
-          px(ex - d + o, ey + 1, '#000'); px(ex - 2 * d + o, ey + 2, '#000');
-        }
-      } else if (mode === 'blink') {
-        rect(ex - 2, ey + 1, 5, 1, '#000');
-      } else {
-        rect(ex - 2, ey - 3, 5, 7, '#000');
-        rect(ex - 1, ey - 3, 3, 1, '#000');
-        rect(ex - 2, ey - 2, 5, 5, '#fff');
-        rect(ex - 1, ey - 3, 3, 1, '#fff');
-        rect(ex - 1, ey + 3, 3, 1, '#fff');
-        rect(ex - 1, ey, 3, 3, '#000'); // pupil looks forward (down)
-        px(ex - 1, ey, '#fff');
-        rect(ex - 3, ey - 2, 1, 5, '#000'); rect(ex + 3, ey - 2, 1, 5, '#000');
-        rect(ex - 1, ey - 4, 3, 1, '#000'); rect(ex - 1, ey + 4, 3, 1, '#000');
+  const cx = dim / 2, cy = dim / 2;
+  const ellipse = (ex, ey, rx, ry, col) => {
+    g.fillStyle = col;
+    for (let y = Math.floor(cy + ey - ry); y <= Math.ceil(cy + ey + ry); y++) {
+      for (let x = Math.floor(cx + ex - rx); x <= Math.ceil(cx + ex + rx); x++) {
+        const u = (x + 0.5 - cx - ex) / rx, v = (y + 0.5 - cy - ey) / ry;
+        if (u * u + v * v <= 1) g.fillRect(x, y, 1, 1);
       }
     }
+  };
+  const dot = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(Math.round(cx + x), Math.round(cy + y), w, h); };
+  const line = (x0, y0, x1, y1, t) => {
+    const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2) + 1;
+    for (let i = 0; i <= n; i++) {
+      const x = x0 + ((x1 - x0) * i) / n, y = y0 + ((y1 - y0) * i) / n;
+      dot(x - t / 2, y - t / 2, t, t, '#000');
+    }
+  };
+  const t = size === 2 ? 1 : 2;            // stroke width of lids and mouths
+  const sep = r * 0.3, ey = r * 0.1;
+  const erx = Math.max(1.6, r * 0.14), ery = Math.max(2.2, r * 0.19);
+  for (const s of [-1, 1]) {
+    const ex = s * sep;
     if (mode === 'hurt') {
-      rect(-2, 11, 4, 3, '#000'); rect(-1, 12, 2, 1, '#c0103a');
+      // squeezed eyes: > <
+      const d = -s;
+      line(ex - d * erx, ey - ery * 0.8, ex + d * erx * 0.6, ey, t);
+      line(ex + d * erx * 0.6, ey, ex - d * erx, ey + ery * 0.8, t);
+    } else if (mode === 'blink') {
+      line(ex - erx, ey + ery * 0.3, ex + erx, ey + ery * 0.3, t);
+    } else if (size === 2) {
+      ellipse(ex, ey, erx, ery, '#000');
+      dot(ex - erx * 0.5, ey - ery * 0.6, 1, 1, '#fff');
     } else {
-      px(-3, 11, '#000'); rect(-2, 12, 5, 1, '#000'); px(3, 11, '#000');
+      ellipse(ex, ey, erx + 1.2, ery + 1.2, '#000');
+      ellipse(ex, ey, erx, ery, '#fff');
+      ellipse(ex, ey + ery * 0.32, erx * 0.62, ery * 0.6, '#000'); // pupil looks forward
+      dot(ex - erx * 0.35, ey, size === 0 ? 2 : 1, size === 0 ? 2 : 1, '#fff');
     }
-  } else if (size === 1) {
-    const ey = 2, sep = 4;
-    for (const s of [-1, 1]) {
-      const ex = s * sep;
-      if (mode === 'hurt') {
-        px(ex - s, ey - 1, '#000'); px(ex, ey, '#000'); px(ex - s, ey + 1, '#000');
-      } else if (mode === 'blink') {
-        rect(ex - 1, ey + 1, 3, 1, '#000');
-      } else {
-        rect(ex - 1, ey - 1, 3, 4, '#000');
-        px(ex - 1, ey - 1, '#fff');
-      }
-    }
-    if (mode === 'hurt') rect(-1, 7, 2, 2, '#000');
-    else { px(-2, 7, '#000'); rect(-1, 8, 3, 1, '#000'); px(2, 7, '#000'); }
+  }
+  const my = r * 0.5, mw = r * 0.16;
+  if (mode === 'hurt') {
+    ellipse(0, my, Math.max(1.5, r * 0.09), Math.max(1.5, r * 0.11), '#000');
+    if (size < 2) ellipse(0, my + r * 0.03, r * 0.05, r * 0.05, '#c0103a');
   } else {
-    const ey = 1, sep = 3;
-    for (const s of [-1, 1]) {
-      const ex = s * sep;
-      if (mode === 'blink' || mode === 'hurt') rect(ex - 1, ey + 1, 2, 1, '#000');
-      else { rect(ex - 1, ey - 1, 2, 3, '#000'); px(ex - 1, ey - 1, '#fff'); }
-    }
-    if (mode === 'hurt') rect(0, 5, 1, 1, '#000');
-    else rect(-1, 5, 2, 1, '#000');
+    // smile: lower half of a circle
+    const mr = mw;
+    for (let a = 0.15; a <= Math.PI - 0.15; a += 0.08) dot(Math.cos(a) * mr - t / 2, my - mr * 0.5 + Math.sin(a) * mr * 0.8 - t / 2, t, t, '#000');
   }
   faceBase.set(key, c);
   return c;
@@ -410,41 +403,5 @@ export function ring(r, color) {
     if (d <= r + 0.5 && d > r - 0.7) g.fillRect(x, y, 1, 1);
   }
   ringCache.set(key, c);
-  return c;
-}
-
-// ---------------------------------------------------------------- 3x5 font
-const FONT = {
-  0: ['###', '#.#', '#.#', '#.#', '###'], 1: ['.#.', '##.', '.#.', '.#.', '###'],
-  2: ['###', '..#', '###', '#..', '###'], 3: ['###', '..#', '.##', '..#', '###'],
-  4: ['#.#', '#.#', '###', '..#', '..#'], 5: ['###', '#..', '###', '..#', '###'],
-  6: ['###', '#..', '###', '#.#', '###'], 7: ['###', '..#', '..#', '.#.', '.#.'],
-  8: ['###', '#.#', '###', '#.#', '###'], 9: ['###', '#.#', '###', '..#', '###'],
-  '+': ['...', '.#.', '###', '.#.', '...'], '.': ['.', '.', '.', '.', '#'],
-  K: ['#.#', '#.#', '##.', '#.#', '#.#'], M: ['#.#', '###', '###', '#.#', '#.#'],
-  G: ['###', '#..', '#.#', '#.#', '###'], T: ['###', '.#.', '.#.', '.#.', '.#.'],
-  P: ['###', '#.#', '###', '#..', '#..'], E: ['###', '#..', '##.', '#..', '###'],
-  Z: ['###', '..#', '.#.', '#..', '###'], Y: ['#.#', '#.#', '.#.', '.#.', '.#.'],
-  R: ['##.', '#.#', '##.', '#.#', '#.#'], Q: ['###', '#.#', '#.#', '###', '..#'],
-  I: ['###', '.#.', '.#.', '.#.', '###'], N: ['#.#', '###', '###', '###', '#.#'],
-  F: ['###', '#..', '##.', '#..', '#..'], '-': ['...', '...', '###', '...', '...'],
-};
-
-// Text with a 1px black outline. Returns a canvas.
-export function textSprite(text, color = '#ffffff') {
-  const glyphs = [...text].map((ch) => FONT[ch] || FONT['-']);
-  const w = glyphs.reduce((s, g) => s + g[0].length + 1, 0) + 1;
-  const c = makeCanvas(w + 1, 7);
-  const g = c.getContext('2d');
-  const draw = (ox, oy, col) => {
-    g.fillStyle = col;
-    let x = 1;
-    for (const gl of glyphs) {
-      for (let y = 0; y < 5; y++) for (let i = 0; i < gl[y].length; i++) if (gl[y][i] === '#') g.fillRect(x + i + ox, 1 + y + oy, 1, 1);
-      x += gl[0].length + 1;
-    }
-  };
-  for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) draw(ox, oy, '#000000');
-  draw(0, 0, color);
   return c;
 }

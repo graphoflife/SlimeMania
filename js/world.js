@@ -1,18 +1,25 @@
 // The game simulation: gun, slimes, waves, projectiles, hits.
 // Pure logic without DOM access, so tools/*.mjs can run it headless in Node.
 import {
-  W, H, SLIME_R, MUZZLE_Y, LOSE_Y, GUN_MIN_X, GUN_MAX_X,
+  W, H, SLIME_R, MUZZLE_Y, LOSE_Y, SPAWN_Y, GUN_MIN_X, GUN_MAX_X,
   GUN_MAX_SPEED, GUN_ACCEL, SLOT_OFFSETS,
 } from './config.js';
 import { RNG, sample } from './rng.js';
 
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
+const UP = -Math.PI / 2;
 const DOWN = Math.PI / 2;
 const MAX_FACE_DEV = 50 * DEG;   // how far a slime may look away from its travel direction
 const MAX_KICK = 70 * DEG;       // extra rotation hits can add on top of that
-const SPEED_MUL = [0.85, 0.95, 1.05];
-const DAMP = 2.6;                // slime velocity decay per second
+const MAX_UP_DEV = 80 * DEG;     // every projectile flies upwards, at most this far from vertical
+const SPEED_MUL = [1, 1.08, 1.16];
+const STEER = 1.4;               // how quickly a slime eases into its new drift (1/s)
+const KICK_DAMP = 3;             // how quickly recoil fades (1/s)
+const GROW_T = 0.5;              // spawn: grow from nothing
+const CHILD_GROW_T = 0.2;        // children grow from CHILD_G0 to full size
+const CHILD_G0 = 0.55;
+const MIN_Y = 8;                 // slimes never get pushed above this
 const INTERMISSION = 2.2;        // pause between waves
 const FF_GAP = 0.35;             // empty field: next slime arrives after at most this
 const CELL = 24;
@@ -20,17 +27,19 @@ const COLS = Math.ceil(W / CELL);
 
 export const WAVE_SIZE = 20;
 
-// The wave is always the same: fixed spawn times and positions.
+// The wave is always the same: fixed spawn times, positions and slime types (0 or 1, half each).
 export const WAVE = (() => {
   const rng = new RNG(20251026);
   const r = SLIME_R[0];
+  const types = Array.from({ length: WAVE_SIZE }, (_, i) => i % 2);
+  for (let i = types.length - 1; i > 0; i--) { const j = rng.int(0, i); [types[i], types[j]] = [types[j], types[i]]; }
   const list = [];
   let t = 0.4;
   let lastX = W / 2;
   for (let i = 0; i < WAVE_SIZE; i++) {
     let x;
-    do { x = rng.range(r + 2, W - r - 2); } while (Math.abs(x - lastX) < 28);
-    list.push({ t, x });
+    do { x = rng.range(r + 2, W - r - 2); } while (Math.abs(x - lastX) < 40);
+    list.push({ t, x, type: types[i] });
     lastX = x;
     t += i < 15 ? rng.range(0.75, 1.75) : rng.range(0.3, 0.6);
   }
@@ -45,6 +54,17 @@ function angDiff(a, b) {
 }
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+
+function easeOutBack(t) {
+  const c1 = 1.70158, c3 = c1 + 1;
+  return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2;
+}
+
+// Current visual scale of a slime (overshoots a little while growing in).
+export function slimeScale(s) {
+  if (s.age >= s.growT) return 1;
+  return s.g0 + (1 - s.g0) * easeOutBack(s.age / s.growT);
+}
 
 function compact(arr) {
   let j = 0;
@@ -133,7 +153,7 @@ export class World {
     compact(this.projs);
     this.updateWave(dt);
     for (const s of this.slimes) {
-      if (s.y >= LOSE_Y) { this.lost = true; this.ev('lose', { x: s.x, y: s.y }); break; }
+      if (s.y + s.r >= LOSE_Y) { this.lost = true; this.ev('lose', { x: s.x, y: s.y }); break; }
     }
   }
 
@@ -165,7 +185,6 @@ export class World {
         em.cd = Math.max(0, em.cd + iv);
         const L = clamp(sample(st.pulse, rng), 0, iv * 0.9);
         em.pulse = { t: 0, L, i: 0 };
-        if (st.sfxPer === 'pulse') this.ev('pulse', { slot: em.slot, wid: st.id });
         this.emitPulse(em);
       }
     }
@@ -188,24 +207,23 @@ export class World {
     if (st.fan && n > 1) a = st.angle.mean + st.angle.spread * ((2 * i) / (n - 1) - 1) + rng.range(-1.5, 1.5);
     else a = sample(st.angle, rng);
     const v = Math.max(20, sample(st.speed, rng));
-    const rad = a * DEG;
+    const rad = UP + a * DEG;
     const x = this.gun.x + SLOT_OFFSETS[em.slot];
-    this.spawnProj(st, 0, x, MUZZLE_Y, Math.sin(rad) * v, -Math.cos(rad) * v, -1, i, null);
+    this.spawnProj(st, 0, x, MUZZLE_Y, rad, v, -1, null);
     this.gun.kick[em.slot] = 1;
-    if (st.sfxPer === 'shot') this.ev('shot', { slot: em.slot, wid: st.id, i });
   }
 
-  spawnProj(w, stage, x, y, vx, vy, ignore, index, tint) {
+  // Projectiles fly in a straight line, always upwards. They only disappear when they
+  // leave the screen or when their last hit lands (where they may split).
+  spawnProj(w, stage, x, y, ang, v, ignore, tint) {
     const s = w.stages[stage];
     const rng = this.rng;
-    const sp = s.split;
-    const life = range(s.life, rng);
+    ang = UP + clamp(angDiff(ang, UP), -MAX_UP_DEV, MAX_UP_DEV);
     if (s.tints && !tint) tint = rng.pick(s.tints);
     this.projs.push({
-      w, stage, s, x, y, vx, vy,
-      hits: s.hits, rest: 0, life, life0: life,
-      splitT: sp && sp.when.includes('time') ? range(sp.time, rng) : Infinity,
-      ang: Math.atan2(vy, vx),
+      w, stage, s, x, y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v,
+      hits: s.hits, rest: 0,
+      ang,
       spin: s.orient === 'spin' ? range(s.spin, rng) * rng.sign() : 0,
       ignore, tint, age: 0, dead: false,
       trail: s.trail ? [x, y] : null,
@@ -218,87 +236,98 @@ export class World {
     const rng = this.rng;
     const n = sp.count;
     const base = Math.atan2(p.vy, p.vx);
-    const rot = rng.next() * TAU;
     const pSpeed = Math.hypot(p.vx, p.vy);
     for (let i = 0; i < n; i++) {
       let a;
-      if (sp.mode === 'radial') a = rot + (i * TAU) / n + rng.range(-0.5, 0.5) * (Math.PI / n);
-      else if (sp.mode === 'fan') a = base + sp.angle * DEG * (n === 1 ? 0 : (2 * i) / (n - 1) - 1);
+      const k = n === 1 ? 0 : (2 * i) / (n - 1) - 1; // -1 .. 1
+      if (sp.mode === 'burst') a = UP + sp.angle * DEG * k + rng.range(-0.5, 0.5) * ((sp.angle * DEG) / n);
+      else if (sp.mode === 'fan') a = base + sp.angle * DEG * k;
       else a = base + rng.range(-1, 1) * sp.angle * DEG;
       const v = sp.speed ? range(sp.speed, rng) : pSpeed * range(sp.speedFactor, rng);
       let tint = p.tint;
       if (sp.tint === 'index') tint = child.tints[i % child.tints.length];
       else if (sp.tint === 'random') tint = rng.pick(child.tints);
-      this.spawnProj(p.w, p.stage + 1, x, y, Math.cos(a) * v, Math.sin(a) * v, ignore, i, tint);
+      this.spawnProj(p.w, p.stage + 1, x, y, a, v, ignore, tint);
     }
-    if (sp.sfx) this.ev('split', { x, y, sfx: sp.sfx });
+    if (sp.fx) this.ev('split', { x, y, fx: sp.fx });
   }
 
   // ---------------------------------------------------------------- slimes
-  makeSlime(size, x, y, hp, color) {
-    return {
-      id: this.nextId++, size, r: SLIME_R[size], x, y, vx: 0, vy: 0,
-      hp, maxHp: hp, color,
+  makeSlime(size, x, y, hp, type) {
+    const s = {
+      id: this.nextId++, size, type, r: SLIME_R[size], x, y,
+      vx: 0, vy: 0,          // steering drift
+      kx: 0, ky: 0,          // recoil, fades out
+      tvx: 0, tvy: 0,        // drift the slime is easing into
+      hp, maxHp: hp,
       heading: DOWN, face: DOWN, faceTarget: DOWN, kick: 0,
-      hopT: this.rng.range(0.1, 0.5),
-      sq: 0, sqv: 0, flash: 0, hurt: 0, blink: this.rng.range(1, 4), age: 0,
+      wanderT: 0,
+      g0: 0, growT: GROW_T,
+      sq: 0, sqv: 0, phase: this.rng.range(0, TAU),
+      flash: 0, flashCd: 0, hurt: 0, blink: this.rng.range(1, 4), age: 0,
       dead: false, stamp: 0,
     };
+    this.wander(s);
+    s.vx = s.tvx;
+    s.vy = s.tvy;
+    return s;
   }
 
   spawnFromWave(i) {
-    const e = WAVE[i];
-    const s = this.makeSlime(0, e.x, -SLIME_R[0], this.bigHp, i);
-    s.vy = 22;
+    const s = this.makeSlime(0, WAVE[i].x, SPAWN_Y, this.bigHp, WAVE[i].type);
+    s.sqv = -2;
     this.slimes.push(s);
-    this.ev('spawn', { x: s.x });
+    this.ev('spawn', { x: s.x, y: s.y });
   }
 
-  hop(s) {
+  // Pick a new drift to ease into. A few kinds of moves with different odds.
+  wander(s) {
     const rng = this.rng;
     const roll = rng.next();
-    let ang = null, spd = 0;
-    if (roll < 0.55) { ang = DOWN + rng.range(-0.6, 0.6); spd = rng.range(26, 46); }          // normal hop
-    else if (roll < 0.75) { ang = DOWN + rng.sign() * rng.range(0.6, 1.4); spd = rng.range(20, 38); } // sideways
-    else if (roll < 0.87) { ang = DOWN + rng.range(-0.35, 0.35); spd = rng.range(52, 72); }    // lunge
-    // else: pause
-    if (ang !== null) {
-      const c = Math.cos(ang);
-      if ((s.x < s.r + 14 && c < 0) || (s.x > W - s.r - 14 && c > 0)) ang = Math.PI - ang;
-      spd *= SPEED_MUL[s.size];
-      s.vx += Math.cos(ang) * spd;
-      s.vy += Math.sin(ang) * spd;
-      s.heading = ang;
-      s.faceTarget = ang + rng.range(-0.45, 0.45);
-      s.sqv -= 1.4;
-    }
-    s.hopT = rng.range(0.45, 1.15);
+    let ang, spd;
+    if (roll < 0.55) { ang = DOWN + rng.range(-0.5, 0.5); spd = rng.range(8, 14); }               // amble down
+    else if (roll < 0.75) { ang = DOWN + rng.sign() * rng.range(0.6, 1.3); spd = rng.range(7, 12); } // drift sideways
+    else if (roll < 0.87) { ang = DOWN + rng.range(-0.3, 0.3); spd = rng.range(15, 22); }          // hurry
+    else { ang = DOWN + rng.range(-0.8, 0.8); spd = rng.range(1, 4); }                               // dawdle
+    const c = Math.cos(ang);
+    if ((s.x < s.r + 10 && c < 0) || (s.x > W - s.r - 10 && c > 0)) ang = Math.PI - ang;
+    spd *= SPEED_MUL[s.size];
+    s.tvx = Math.cos(ang) * spd;
+    s.tvy = Math.sin(ang) * spd;
+    s.faceTarget = ang + rng.range(-0.45, 0.45);
+    s.wanderT = rng.range(0.8, 2.0);
   }
 
   updateSlimes(dt) {
-    const damp = Math.exp(-DAMP * dt);
-    const faceK = 1 - Math.exp(-5 * dt);
+    const steer = 1 - Math.exp(-STEER * dt);
+    const kdamp = Math.exp(-KICK_DAMP * dt);
+    const faceK = 1 - Math.exp(-3 * dt);
     const kickK = Math.exp(-3 * dt);
     for (const s of this.slimes) {
       s.age += dt;
-      s.hopT -= dt;
-      if (s.hopT <= 0) this.hop(s);
-      s.vx *= damp;
-      s.vy *= damp;
-      s.x += s.vx * dt;
-      s.y += s.vy * dt;
-      if (s.x < s.r) { s.x = s.r; s.vx = Math.abs(s.vx) * 0.5; }
-      else if (s.x > W - s.r) { s.x = W - s.r; s.vx = -Math.abs(s.vx) * 0.5; }
-      if (s.y < -s.r) { s.y = -s.r; if (s.vy < 0) s.vy = 0; }
+      s.wanderT -= dt;
+      if (s.wanderT <= 0) this.wander(s);
+      s.vx += (s.tvx - s.vx) * steer;
+      s.vy += (s.tvy - s.vy) * steer;
+      s.kx *= kdamp;
+      s.ky *= kdamp;
+      s.x += (s.vx + s.kx) * dt;
+      s.y += (s.vy + s.ky) * dt;
+      if (s.x < s.r) { s.x = s.r; s.kx = Math.abs(s.kx) * 0.5; if (s.tvx < 0) s.tvx = -s.tvx; }
+      else if (s.x > W - s.r) { s.x = W - s.r; s.kx = -Math.abs(s.kx) * 0.5; if (s.tvx > 0) s.tvx = -s.tvx; }
+      if (s.y < MIN_Y) { s.y = MIN_Y; if (s.ky < 0) s.ky = 0; }
       // facing: follows the travel direction, but never looks too far off
+      s.heading = Math.atan2(s.vy, s.vx);
       s.face += angDiff(s.faceTarget, s.face) * faceK;
       const dev = angDiff(s.face, s.heading);
       if (Math.abs(dev) > MAX_FACE_DEV) s.face = s.heading + Math.sign(dev) * MAX_FACE_DEV;
       s.kick *= kickK;
-      // jelly squash spring
-      s.sqv += (-180 * s.sq - 11 * s.sqv) * dt;
+      // jelly squash spring around a gentle breathing wobble
+      const rest = 0.03 * Math.sin(s.age * 3.2 + s.phase);
+      s.sqv += (-120 * (s.sq - rest) - 9 * s.sqv) * dt;
       s.sq += s.sqv * dt;
       if (s.flash > 0) s.flash -= dt;
+      if (s.flashCd > 0) s.flashCd -= dt;
       if (s.hurt > 0) s.hurt -= dt;
       s.blink -= dt;
       if (s.blink < -0.12) s.blink = this.rng.range(1.5, 5);
@@ -308,20 +337,19 @@ export class World {
   killSlime(s) {
     s.dead = true;
     this.earned += s.maxHp;
-    this.ev('pop', { x: s.x, y: s.y, r: s.r, size: s.size, color: s.color, value: s.maxHp });
+    this.ev('pop', { x: s.x, y: s.y, r: s.r, size: s.size, kind: s.type, value: s.maxHp });
     if (s.size >= 2) return;
     const rng = this.rng;
     const base = rng.next() * TAU;
     for (let k = 0; k < 3; k++) {
       const a = base + (k * TAU) / 3 + rng.range(-0.3, 0.3);
-      const c = this.makeSlime(s.size + 1, s.x + Math.cos(a) * s.r * 0.42, s.y + Math.sin(a) * s.r * 0.42, s.maxHp / 3, s.color);
-      c.vx = s.vx * 0.3 + Math.cos(a) * 55;
-      c.vy = s.vy * 0.3 + Math.sin(a) * 55;
-      c.heading = s.heading;
+      const c = this.makeSlime(s.size + 1, s.x + Math.cos(a) * s.r * 0.42, s.y + Math.sin(a) * s.r * 0.42, s.maxHp / 3, s.type);
+      c.kx = s.kx * 0.3 + Math.cos(a) * 50;
+      c.ky = s.ky * 0.3 + Math.sin(a) * 50;
       c.face = c.faceTarget = s.face + rng.range(-0.6, 0.6);
-      c.sq = 0.15;
-      c.sqv = 3;
-      c.hopT = rng.range(0.25, 0.6);
+      c.g0 = CHILD_G0;
+      c.growT = CHILD_GROW_T;
+      c.sqv = 2.5;
       this.pending.push(c);
     }
   }
@@ -330,8 +358,9 @@ export class World {
     const g = this.grid;
     for (let c = 0; c < COLS; c++) g[c].length = 0;
     for (const s of this.slimes) {
-      const c0 = clamp(Math.floor((s.x - s.r) / CELL), 0, COLS - 1);
-      const c1 = clamp(Math.floor((s.x + s.r) / CELL), 0, COLS - 1);
+      s.hr = s.r * Math.min(1, slimeScale(s)); // hit radius, smaller while growing in
+      const c0 = clamp(Math.floor((s.x - s.hr) / CELL), 0, COLS - 1);
+      const c1 = clamp(Math.floor((s.x + s.hr) / CELL), 0, COLS - 1);
       for (let c = c0; c <= c1; c++) g[c].push(s);
     }
   }
@@ -342,10 +371,7 @@ export class World {
     for (let i = 0; i < n; i++) {
       const p = this.projs[i];
       if (p.dead) continue;
-      const s = p.s;
       p.age += dt;
-      p.life -= dt;
-      if (s.drag) { const k = Math.exp(-s.drag * dt); p.vx *= k; p.vy *= k; }
       const px = p.x, py = p.y;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
@@ -354,15 +380,6 @@ export class World {
       if (p.rest > 0) p.rest -= dt;
       if (p.rest <= 0) this.collide(p, px, py);
       if (p.dead) continue;
-      if (p.splitT !== Infinity) {
-        p.splitT -= dt;
-        if (p.splitT <= 0) { this.split(p, p.x, p.y, -1); p.dead = true; continue; }
-      }
-      if (p.life <= 0) {
-        if (s.split && s.split.when.includes('expire')) this.split(p, p.x, p.y, -1);
-        p.dead = true;
-        continue;
-      }
       if (p.x < -16 || p.x > W + 16 || p.y < -130 || p.y > H + 16) p.dead = true;
     }
   }
@@ -381,7 +398,7 @@ export class World {
         if (sl.stamp === stamp) continue;
         sl.stamp = stamp;
         if (sl.dead || sl.id === p.ignore) continue;
-        const t = segCircle(px, py, p.x, p.y, sl.x, sl.y, sl.r);
+        const t = segCircle(px, py, p.x, p.y, sl.x, sl.y, sl.hr);
         if (t < 0) continue;
         // ties (already inside several): the smaller slime is on top, it gets hit
         if (t < bestT - 1e-6 || (t < bestT + 1e-6 && sl.size > best.size)) { best = sl; bestT = t; }
@@ -398,19 +415,18 @@ export class World {
     this.dealt += Math.min(s.dmg, before);
     const sp = Math.hypot(p.vx, p.vy) || 1;
     const k = s.recoil * (SLIME_R[0] / sl.r);
-    sl.vx += (p.vx / sp) * k;
-    sl.vy += (p.vy / sp) * k;
+    sl.kx += (p.vx / sp) * k;
+    sl.ky += (p.vy / sp) * k;
     sl.kick = clamp(sl.kick + rng.range(-1, 1) * s.rotKick * DEG, -MAX_KICK, MAX_KICK);
     sl.sqv += 1.2 + Math.min(3, s.recoil * 0.08);
-    sl.flash = 0.05;
+    if (sl.flashCd <= 0) { sl.flash = 0.035; sl.flashCd = 0.12; } // short white flash, not too often
     sl.hurt = 0.18;
     this.ev('hit', { x: hx, y: hy });
     if (sl.hp <= 1e-9 * sl.maxHp) this.killSlime(sl);
     p.hits--;
     p.rest = s.rest;
-    if (s.slowOnHit !== 1) { p.vx *= s.slowOnHit; p.vy *= s.slowOnHit; }
     if (p.hits <= 0) {
-      if (s.split && s.split.when.includes('hit')) this.split(p, hx, hy, sl.id);
+      if (s.split) this.split(p, hx, hy, sl.id);
       p.dead = true;
     }
   }

@@ -6,7 +6,7 @@ export const H = 384;
 export const MAX_EXTRA = 120;
 
 // Radii of big / medium / small slimes. 3 children have the same area as the parent.
-export const SLIME_R = [26, 15, 9];
+export const SLIME_R = [39, 22.5, 13];
 
 // Chain belt & gun
 export const SPROCKET_R = 6;
@@ -18,10 +18,13 @@ export const GUN_HALF = 13;
 export const GUN_MIN_X = SPROCKET_LX + GUN_HALF + 3;
 export const GUN_MAX_X = SPROCKET_RX - GUN_HALF - 3;
 export const MUZZLE_Y = 331;
-export const GUN_MAX_SPEED = 240;
-export const GUN_ACCEL = 2200;
+export const GUN_MAX_SPEED = 480;
+export const GUN_ACCEL = 4400;
 export const SLOT_OFFSETS = [0, -7, 7];        // barrel x-offset of each equipped weapon slot
 export const MAX_EQUIPPED = 3;
 
-// A slime whose centre reaches this line has reached the bottom: level lost.
-export const LOSE_Y = 324;
+// A slime whose bottom edge reaches this line (top of the belt housing) has reached the
+// bottom: level lost.
+export const LOSE_Y = 350;
+// Big slimes grow into existence here (centre y).
+export const SPAWN_Y = 18;

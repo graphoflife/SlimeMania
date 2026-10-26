@@ -2,10 +2,17 @@
 
 A small, satisfying pixel-art shooter for the browser, for phones and desktop.
 
-Giant slimes hop down from the sky. Your turret rides a chain belt along the bottom and fires on
-its own. Every slime pops into three smaller ones, and those pop into three tiny ones. Every pop
-pays out its HP as money. Spend the money on 30 weird weapons and exponential upgrades, then push
-to higher levels.
+Giant slimes grow into existence at the top of the sky and wobble their way down. Your turret
+rides a chain belt along the bottom and fires on its own. Every slime pops into three smaller ones,
+and those pop into three tiny ones. Every pop pays out its HP as money. Spend the money on 30 weird
+weapons and exponential upgrades, then push to higher levels.
+
+Each level has two slime types. Each type has its own colour for big, medium and small, and all six
+colours are different. They are re-rolled whenever a level is loaded.
+
+Every projectile is fast and flies straight up until it hits a slime or leaves the screen. Nothing
+explodes early; sub-projectiles are only released where a hit lands. Weapons are silent, only the
+slime hits and pops make sound.
 
 ## How to play
 
