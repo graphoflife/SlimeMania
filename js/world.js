@@ -133,6 +133,8 @@ export class World {
     this.lost = false;
     this.earned = 0;
     this.dealt = 0;
+    this.lostHits = 0;  // hits flown off screen by projectiles that had already hit (stats)
+    this.usedHits = 0;
     this.time = 0;
     for (const em of this.emitters) { em.pulse = null; em.cd = this.rng.range(0.05, 0.25); }
     this.ev('waveStart', { n: 1, level });
@@ -156,7 +158,7 @@ export class World {
     this.buildGrid();
     this.updateProjectiles(dt);
     compact(this.slimes);
-    if (this.pending.length) { for (const s of this.pending) this.slimes.push(s); this.pending.length = 0; }
+    if (this.pending.length) { for (const s of this.pending) if (!s.dead) this.slimes.push(s); this.pending.length = 0; }
     compact(this.projs);
     this.updateWave(dt);
     for (const s of this.slimes) {
@@ -224,8 +226,12 @@ export class World {
       const pos = st.sweep && em.back ? n - 1 - i : i;
       a = st.angle.mean + st.angle.spread * ((2 * pos) / (n - 1) - 1) + (st.sweep ? 0 : rng.range(-1.5, 1.5));
       if (st.tintByFan) tint = st.stages[0].tints[pos % st.stages[0].tints.length];
+    } else if (st.beam) {
+      a = em.beamAngle = i === 0 ? sample(st.angle, rng) : em.beamAngle; // one line for the whole pulse
     } else a = sample(st.angle, rng);
-    const v = Math.max(20, sample(st.speed, rng));
+    const v = st.beam && n > 1
+      ? st.speed.mean + st.speed.spread * ((2 * i) / (n - 1) - 1)    // evenly stepped speeds
+      : Math.max(20, sample(st.speed, rng));
     const rad = UP + a * DEG;
     const x = this.gun.x + SLOT_OFFSETS[em.slot];
     this.spawnProj(st, 0, x, MUZZLE_Y, rad, v, -1, tint);
@@ -244,7 +250,7 @@ export class World {
       hits: s.hits, rest: 0,
       ang,
       spin: s.orient === 'spin' ? range(s.spin, rng) * rng.sign() : 0,
-      ignore, tint, age: 0, dist: 0, dead: false,
+      ignore, tint, age: 0, dist: 0, dead: false, lastHit: null,
       trail: s.trail === 'bolt' ? [x, y] : null,
     });
   }
@@ -400,7 +406,16 @@ export class World {
       if (p.rest > 0) p.rest -= dt;
       if (p.rest <= 0) this.collide(p, px, py);
       if (p.dead) continue;
-      if (p.x < -16 || p.x > W + 16 || p.y < this.topY - 40 || p.y > H + 16) p.dead = true;
+      // Already hit something, nothing reliably ahead any more (e.g. the slime it aimed for
+      // was popped by other shots): the slime it hit last gets the remaining hits now.
+      if (p.lastHit && p.rest <= 0 && !this.canHitAgain(p, null, p.x, p.y)) {
+        this.deliverRest(p, p.lastHit.dead ? null : p.lastHit, p.x, p.y);
+        continue;
+      }
+      if (p.x < -16 || p.x > W + 16 || p.y < this.topY - 40 || p.y > H + 16) {
+        p.dead = true;
+        if (p.hits < p.s.hits) this.lostHits += p.hits;
+      }
     }
   }
 
@@ -445,16 +460,14 @@ export class World {
     const killed = sl.hp <= 1e-9 * sl.maxHp;
     if (killed) this.killSlime(sl);
     p.hits--;
+    this.usedHits++;
     p.rest = s.rest;
-    // No wasted hits: if this projectile will not get another hit before it leaves the
-    // screen, this slime gets all of its remaining hits right now.
-    if (p.hits > 0 && !killed && !this.canHitAgain(p, sl, hx, hy)) {
-      const extra = s.dmg * p.hits;
-      const left = sl.hp;
-      sl.hp -= extra;
-      this.dealt += Math.min(extra, left);
-      if (sl.hp <= 1e-9 * sl.maxHp) this.killSlime(sl);
-      p.hits = 0;
+    p.lastHit = killed ? this.nearestChild(hx, hy) : sl;
+    // No wasted hits: unless the projectile is sure to land another hit, the remaining hits
+    // land right now (on this slime, or on one of its children if this hit popped it).
+    if (p.hits > 0 && !this.canHitAgain(p, killed ? null : sl, hx, hy)) {
+      this.deliverRest(p, p.lastHit, hx, hy, sl.id);
+      return;
     }
     if (p.hits <= 0) {
       if (s.split) this.split(p, hx, hy, sl.id);
@@ -462,18 +475,60 @@ export class World {
     }
   }
 
-  // Will the projectile still be inside this slime when its rest is over, or meet
-  // another slime on its way out of the screen?
-  canHitAgain(p, sl, hx, hy) {
-    const rx = hx + p.vx * p.rest, ry = hy + p.vy * p.rest;
-    if ((rx - sl.x) ** 2 + (ry - sl.y) ** 2 < sl.hr * sl.hr) return true;
-    const sp = Math.hypot(p.vx, p.vy) || 1;
-    const ex = rx + (p.vx / sp) * 700, ey = ry + (p.vy / sp) * 700;
-    for (const o of this.slimes) {
-      if (o.dead || o.id === p.ignore) continue;
-      if (segCircle(rx, ry, ex, ey, o.x, o.y, o.hr) >= 0) return true;
+  // All remaining hits of a projectile land on one slime at once; then it is used up.
+  deliverRest(p, into, x, y, ignore = -1) {
+    if (into && p.hits > 0) {
+      const extra = p.s.dmg * p.hits;
+      const left = into.hp;
+      into.hp -= extra;
+      this.dealt += Math.min(extra, left);
+      this.usedHits += p.hits;
+      into.flash = 0.035;
+      // show the hit on the slime's edge facing the projectile
+      const dx = x - into.x, dy = y - into.y, d = Math.hypot(dx, dy) || 1, k = Math.min(1, (into.r * 0.85) / d);
+      this.ev('hit', { x: into.x + dx * k, y: into.y + dy * k });
+      if (into.hp <= 1e-9 * into.maxHp) this.killSlime(into);
     }
+    p.hits = 0;
+    if (p.s.split) this.split(p, x, y, ignore);
+    p.dead = true;
+  }
+
+  // A careful estimate, erring on the side of "no": will the projectile land another hit?
+  // Either it is still well inside the slime it just hit when its rest is over (allowing
+  // for that slime drifting), or a slime lies squarely ahead: its predicted position is
+  // crossed through the middle, and the projectile is still inside it after the rest.
+  canHitAgain(p, cur, hx, hy) {
+    const sp = Math.hypot(p.vx, p.vy) || 1, ux = p.vx / sp, uy = p.vy / sp;
+    const rx = hx + ux * sp * p.rest, ry = hy + uy * sp * p.rest;
+    const drift = (o, t) => Math.hypot(o.vx + o.kx, o.vy + o.ky) * t;
+    if (cur) {
+      const cx = cur.x + (cur.vx + cur.kx) * p.rest, cy = cur.y + (cur.vy + cur.ky) * p.rest;
+      if (Math.hypot(rx - cx, ry - cy) < cur.hr - 3 - drift(cur, p.rest)) return true;
+    }
+    const ahead = (o) => {
+      if (o.dead || o === cur || o.id === p.ignore) return false;
+      const t = Math.max(0, ((o.x - rx) * ux + (o.y - ry) * uy) / sp) + p.rest;
+      const ox = o.x + (o.vx + o.kx) * t - rx, oy = o.y + (o.vy + o.ky) * t - ry;
+      const along = ox * ux + oy * uy;
+      const across = Math.abs(ox * uy - oy * ux);
+      const r = (o.hr || o.r * 0.55) * 0.65;
+      if (across > r) return false;
+      return along + Math.sqrt(r * r - across * across) > 4; // still inside after the rest
+    };
+    for (const o of this.slimes) if (ahead(o)) return true;
+    for (const o of this.pending) if (ahead(o)) return true;
     return false;
+  }
+
+  // the child slime (just popped out this step) closest to a point
+  nearestChild(x, y) {
+    let best = null, bd = Infinity;
+    for (const c of this.pending) {
+      const d = (c.x - x) ** 2 + (c.y - y) ** 2;
+      if (d < bd) { bd = d; best = c; }
+    }
+    return best;
   }
 
   // ---------------------------------------------------------------- waves

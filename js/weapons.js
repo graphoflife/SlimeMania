@@ -8,6 +8,8 @@
 //   angle     launch angle in degrees, 0 = straight up (range). fan: spread evenly.
 //             sweep: a fan that goes left to right, then back right to left, without a break
 //             (the pulse fills the interval). tintByFan: colour each shot by its fan position.
+//             beam: the shots of a pulse share one angle and get evenly stepped speeds.
+//   (trailFrac: tail length as a fraction of the distance flown, instead of trailLen)
 //
 // Stage parameters (stage 0 = the projectile, 1 = sub projectiles, 2 = sub-sub)
 //   share     fraction of the total damage carried by this stage
@@ -78,10 +80,11 @@ export const WEAPONS = [
   },
   {
     id: 'laser', name: 'Laser', desc: 'One long, solid beam that pierces everything.',
-    // many short segments back to back: their tails overlap into one continuous beam
-    interval: U(0.45, 0.05), count: 8, pulse: U(0.16), angle: U(0),
-    speed: U(1200),
-    stages: [{ sprite: 'laser', trail: 'laser', trailLen: 32, hits: 15, rest: 0.017, recoil: 1, rotKick: 5 }],
+    // 8 segments leave together, each a step faster than the one behind: they stretch out
+    // along one line, and their tails fill the gaps, so it looks like one long beam
+    interval: U(0.45, 0.05), count: 8, pulse: U(0), beam: true,
+    speed: U(1050, 350), angle: U(0, 1),
+    stages: [{ sprite: 'laser', trail: 'laser', trailFrac: 0.17, hits: 15, rest: 0.017, recoil: 1, rotKick: 5 }],
   },
   {
     id: 'bomb', name: 'Small Bomb', desc: 'A bomb that bursts into shrapnel.',
@@ -312,6 +315,7 @@ export function buildStats(def, level, nominalDps) {
   return {
     id: def.id, def, level, dps, interval, pulse, stages,
     count: def.count, speed: def.speed, angle: def.angle, fan: def.fan, sweep: def.sweep, tintByFan: def.tintByFan,
+    beam: def.beam,
   };
 }
 

@@ -233,7 +233,7 @@ export class Renderer {
     const g = this.g;
     const sp = Math.hypot(p.vx, p.vy) || 1, ux = p.vx / sp, uy = p.vy / sp;
     const nx = -uy, ny = ux;
-    const len = Math.min(st.trailLen, p.dist);
+    const len = st.trailFrac ? p.dist * st.trailFrac : Math.min(st.trailLen, p.dist);
     if (len < 2) return;
     const x1 = p.x - ux * 3, y1 = p.y - uy * 3;           // start just behind the sprite centre
     const at = (k, off = 0) => [p.x - ux * len * k + nx * off, p.y - uy * len * k + ny * off];
