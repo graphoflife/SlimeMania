@@ -245,14 +245,39 @@ export class World {
     const rng = this.rng;
     ang = UP + clamp(angDiff(ang, UP), -MAX_UP_DEV, MAX_UP_DEV);
     if (s.tints && !tint) tint = rng.pick(s.tints);
-    this.projs.push({
+    const p = {
       w, stage, s, x, y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v,
       hits: s.hits, rest: 0,
       ang,
       spin: s.orient === 'spin' ? range(s.spin, rng) * rng.sign() : 0,
       ignore, tint, age: 0, dist: 0, dead: false, lastHit: null,
       trail: s.trail === 'bolt' ? [x, y] : null,
-    });
+    };
+    if (s.aim && !this.canHitAgain(p, null, x, y)) this.aimAtClosest(p);
+    this.projs.push(p);
+  }
+
+  // A shot that would obviously miss turns towards the closest slime, in any direction,
+  // aiming where that slime will be when the shot gets there.
+  aimAtClosest(p) {
+    const v = Math.hypot(p.vx, p.vy);
+    let best = null, bd = Infinity;
+    for (const list of [this.slimes, this.pending]) {
+      for (const o of list) {
+        if (o.dead || o.id === p.ignore) continue;
+        const d = Math.hypot(o.x - p.x, o.y - p.y);
+        const t = d / v;
+        const tx = o.x + (o.vx + o.kx) * t, ty = o.y + (o.vy + o.ky) * t;
+        const a = Math.atan2(ty - p.y, tx - p.x);
+        if (d >= bd) continue;
+        bd = d;
+        best = a;
+      }
+    }
+    if (best === null) return;
+    p.vx = Math.cos(best) * v;
+    p.vy = Math.sin(best) * v;
+    if (p.s.orient !== 'spin') p.ang = best;
   }
 
   split(p, x, y, ignore) {
