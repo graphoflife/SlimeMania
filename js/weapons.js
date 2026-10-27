@@ -39,6 +39,7 @@ const N = (mean, spread) => ({ mean, spread, dist: 'n' });
 
 export const TINTS = {
   party: ['#ff3a7c', '#3ad7ff', '#ffe23a', '#7dff3a', '#c04dff', '#ff8c1a'],
+  stars: ['#5aa8ff', '#ff4a4a', '#ffd23a'], // blue, red, yellow
   // pastel rainbow, from the left of the fan to the right
   pastel: ['#ff8f9f', '#ffc27a', '#fff27a', '#93ec93', '#8cc8ff', '#c99cff'],
 };
@@ -137,9 +138,9 @@ export const WEAPONS = [
     stages: [
       { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.2, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10,
         split: { count: 2, mode: 'cone', angle: 35, speedFactor: [0.9, 1.1] } },
-      { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.35, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10,
+      { sprite: 'bolt', orient: 'none', trail: 'bolt', aim: true, share: 0.35, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10,
         split: { count: 2, mode: 'cone', angle: 35, speedFactor: [0.9, 1.1] } },
-      { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.45, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10 },
+      { sprite: 'bolt', orient: 'none', trail: 'bolt', aim: true, share: 0.45, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10 },
     ],
   },
   {
@@ -173,9 +174,9 @@ export const WEAPONS = [
     stages: [
       { sprite: ['plasma0', 'plasma1'], anim: 8, orient: 'none', share: 0.25, hits: 5, rest: 0.03, recoil: 1.3, rotKick: 6,
         split: { count: 2, mode: 'cone', angle: 30, speedFactor: [0.95, 1.05], fx: 'plasma' } },
-      { sprite: ['plasma_m0', 'plasma_m1'], anim: 8, orient: 'none', share: 0.35, hits: 5, rest: 0.03, recoil: 1, rotKick: 6,
+      { sprite: ['plasma_m0', 'plasma_m1'], anim: 8, orient: 'none', aim: true, share: 0.35, hits: 5, rest: 0.03, recoil: 1, rotKick: 6,
         split: { count: 2, mode: 'cone', angle: 30, speedFactor: [0.95, 1.05], fx: 'plasma' } },
-      { sprite: ['plasma_s0', 'plasma_s1'], anim: 8, orient: 'none', share: 0.4, hits: 5, rest: 0.03, recoil: 0.7, rotKick: 6 },
+      { sprite: ['plasma_s0', 'plasma_s1'], anim: 8, orient: 'none', aim: true, share: 0.4, hits: 5, rest: 0.03, recoil: 0.7, rotKick: 6 },
     ],
   },
   {
@@ -263,13 +264,13 @@ export const WEAPONS = [
   {
     id: 'nova', name: 'Supernova', desc: 'A star that explodes into stars that explode.',
     interval: U(1.0, 0.2), count: 1, pulse: U(0),
-    speed: U(600), angle: U(0, 4),
+    speed: U(900), angle: U(0, 4),
     stages: [
-      { sprite: 'star_big', orient: 'spin', spin: [4, 6], trail: 'star', trailLen: 44, share: 0.2, hits: 8, rest: 0.033, recoil: 3.3, rotKick: 14,
-        split: { count: 8, mode: 'burst', angle: 75, speed: [570, 690], fx: 'nova' } },
-      { sprite: 'star', orient: 'spin', spin: [6, 10], trail: 'star', trailLen: 22, aim: true, share: 0.4, hits: 4, rest: 0.033, recoil: 2, rotKick: 10,
-        split: { count: 5, mode: 'burst', angle: 60, speed: [570, 690], fx: 'boom_s' } },
-      { sprite: 'spark_w', orient: 'none', aim: true, share: 0.4, hits: 4, rest: 0.027, recoil: 1.3, rotKick: 8 },
+      { sprite: 'star_big', orient: 'spin', spin: [4, 6], tints: TINTS.stars, trail: 'star', trailLen: 70, share: 0.2, hits: 8, rest: 0.022, recoil: 3.3, rotKick: 14,
+        split: { count: 8, mode: 'burst', angle: 75, speed: [855, 1035], tint: 'random', fx: 'nova' } },
+      { sprite: 'star', orient: 'spin', spin: [6, 10], tints: TINTS.stars, trail: 'star', trailLen: 38, aim: true, share: 0.4, hits: 4, rest: 0.022, recoil: 2, rotKick: 10,
+        split: { count: 5, mode: 'burst', angle: 60, speed: [855, 1035], fx: 'boom_s' } },
+      { sprite: 'spark_w', orient: 'none', aim: true, share: 0.4, hits: 4, rest: 0.018, recoil: 1.3, rotKick: 8 },
     ],
   },
 ];

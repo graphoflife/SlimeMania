@@ -4,7 +4,7 @@ import {
 } from './config.js';
 import { Background } from './background.js';
 import {
-  sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas,
+  sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas, mix,
 } from './sprites.js';
 import { slimeScale } from './world.js';
 
@@ -294,22 +294,33 @@ export class Renderer {
         for (let k = 0.25; k <= 1; k += 0.25) { const [a, b] = at(k); discFill(g, a, b, 1.2 + k, '#c8ccd6'); }
         g.globalAlpha = 1;
         break;
-      case 'star':
-        // shooting star: a glowing streak that tapers from white-gold to orange,
+      case 'star': {
+        // shooting star in the star's colour: a soft wide glow around a crisp bright core,
         // with little stars twinkling around it
-        line(0.05, 0.35, 0, '#fff7b0', 5);
-        line(0.35, 0.65, 0, '#ffe23a', 3);
-        line(0.65, 1, 0, '#ff9a1a', 1);
+        const t = p.tint || '#ffd23a', light = mix(t, '#ffffff', 0.55);
+        const [ex, ey] = at(1), [mx, my] = at(0.6);
+        g.lineCap = 'round';
+        g.strokeStyle = t;
+        g.globalAlpha = 0.22;
+        g.lineWidth = 11;
+        g.beginPath(); g.moveTo(x1, y1); g.lineTo(ex, ey); g.stroke();
+        g.globalAlpha = 0.4;
+        g.lineWidth = 6;
+        g.beginPath(); g.moveTo(x1, y1); g.lineTo(mx, my); g.stroke();
+        g.globalAlpha = 1;
+        line(0.05, 0.45, 0, light, 3);
+        line(0.45, 0.8, 0, t, 2);
         line(0.05, 0.3, 0, '#ffffff', 1);
-        for (let k = 0.15; k <= 1; k += 0.17) {
+        for (let k = 0.12; k <= 1; k += 0.12) {
           if (Math.random() < 0.3) continue;
-          const [a, b] = at(k, (Math.random() * 2 - 1) * 3);
+          const [a, b] = at(k, (Math.random() * 2 - 1) * 5);
           const X = Math.round(a), Y = Math.round(b);
-          g.fillStyle = Math.random() < 0.5 ? '#ffffff' : '#ffe23a';
+          g.fillStyle = Math.random() < 0.5 ? '#ffffff' : light;
           g.fillRect(X, Y - 1, 1, 3);
           g.fillRect(X - 1, Y, 3, 1);
         }
         break;
+      }
     }
   }
 

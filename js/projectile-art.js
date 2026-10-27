@@ -350,10 +350,13 @@ const DEFS = {
       .dots([[5, 4]], '#f0c090');
   },
 
-  star: () => A(11, 11).shape(star(5.5, 5.8, 5, 5.2, 2.2), YELLOW).dot(4, 4, '#ffffff'),
-  star_big: () => A(19, 19)
-    .shape(star(9.5, 10, 5, 9.2, 3.9), YELLOW)
-    .shape(star(9.5, 10, 5, 4.6, 1.9), flat('#fff3a0'))
+  star: (t) => A(11, 11)
+    .shape(star(5.5, 5.8, 5, 5.2, 2.2), tintP(t))
+    .shape(star(5.5, 5.8, 5, 2.4, 1), flat(mix(t, '#ffffff', 0.6)))
+    .dot(4, 4, '#ffffff'),
+  star_big: (t) => A(19, 19)
+    .shape(star(9.5, 10, 5, 9.2, 3.9), tintP(t))
+    .shape(star(9.5, 10, 5, 4.6, 1.9), flat(mix(t, '#ffffff', 0.6)))
     .dots([[7, 7], [8, 7]], '#ffffff'),
   spark_w: () => A(5, 5).shape(star(2.5, 2.5, 4, 2.4, 0.9), flat('#fff7b0')).dot(2, 2, '#ffffff'),
 };
