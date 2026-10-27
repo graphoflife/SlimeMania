@@ -252,6 +252,7 @@ export class World {
       spin: s.orient === 'spin' ? range(s.spin, rng) * rng.sign() : 0,
       ignore, tint, age: 0, dist: 0, dead: false, lastHit: null,
       trail: s.trail === 'bolt' ? [x, y] : null,
+      spr: null, sprName: null, // sprite cache of the renderer
     };
     if (s.aim && !this.canHitAgain(p, null, x, y)) this.aimAtClosest(p);
     this.projs.push(p);
@@ -447,6 +448,7 @@ export class World {
   collide(p, px, py) {
     const x0 = Math.min(px, p.x), x1 = Math.max(px, p.x);
     if (x1 < 0 || x0 >= W) return;
+    const y0 = Math.min(py, p.y), y1 = Math.max(py, p.y);
     const c0 = clamp(Math.floor(x0 / CELL), 0, COLS - 1);
     const c1 = clamp(Math.floor(x1 / CELL), 0, COLS - 1);
     const stamp = ++this.stamp;
@@ -457,7 +459,7 @@ export class World {
         const sl = cell[k];
         if (sl.stamp === stamp) continue;
         sl.stamp = stamp;
-        if (sl.dead || sl.id === p.ignore) continue;
+        if (sl.dead || sl.id === p.ignore || sl.y + sl.hr < y0 || sl.y - sl.hr > y1) continue;
         const t = segCircle(px, py, p.x, p.y, sl.x, sl.y, sl.hr);
         if (t < 0) continue;
         // ties (already inside several): the smaller slime is on top, it gets hit
@@ -528,24 +530,29 @@ export class World {
   // crossed through the middle, and the projectile is still inside it after the rest.
   canHitAgain(p, cur, hx, hy) {
     const sp = Math.hypot(p.vx, p.vy) || 1, ux = p.vx / sp, uy = p.vy / sp;
-    const rx = hx + ux * sp * p.rest, ry = hy + uy * sp * p.rest;
-    const drift = (o, t) => Math.hypot(o.vx + o.kx, o.vy + o.ky) * t;
+    const rest = p.rest, rx = hx + ux * sp * rest, ry = hy + uy * sp * rest;
     if (cur) {
-      const cx = cur.x + (cur.vx + cur.kx) * p.rest, cy = cur.y + (cur.vy + cur.ky) * p.rest;
-      if (Math.hypot(rx - cx, ry - cy) < cur.hr - 3 - drift(cur, p.rest)) return true;
+      const cvx = cur.vx + cur.kx, cvy = cur.vy + cur.ky;
+      const cx = cur.x + cvx * rest, cy = cur.y + cvy * rest;
+      if (Math.hypot(rx - cx, ry - cy) < cur.hr - 3 - Math.hypot(cvx, cvy) * rest) return true;
     }
-    const ahead = (o) => {
-      if (o.dead || o === cur || o.id === p.ignore) return false;
-      const t = Math.max(0, ((o.x - rx) * ux + (o.y - ry) * uy) / sp) + p.rest;
-      const ox = o.x + (o.vx + o.kx) * t - rx, oy = o.y + (o.vy + o.ky) * t - ry;
-      const along = ox * ux + oy * uy;
-      const across = Math.abs(ox * uy - oy * ux);
+    return this.slimeAhead(this.slimes, p, cur, rx, ry, ux, uy, sp) || this.slimeAhead(this.pending, p, cur, rx, ry, ux, uy, sp);
+  }
+
+  // Does a slime of the list lie squarely ahead of the ray from (rx, ry)?
+  slimeAhead(list, p, cur, rx, ry, ux, uy, sp) {
+    const rest = p.rest, ignore = p.ignore;
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
+      if (o.dead || o === cur || o.id === ignore) continue;
+      const vx = o.vx + o.kx, vy = o.vy + o.ky;
+      const t = Math.max(0, ((o.x - rx) * ux + (o.y - ry) * uy) / sp) + rest;
+      const ox = o.x + vx * t - rx, oy = o.y + vy * t - ry;
       const r = (o.hr || o.r * 0.55) * 0.65;
-      if (across > r) return false;
-      return along + Math.sqrt(r * r - across * across) > 4; // still inside after the rest
-    };
-    for (const o of this.slimes) if (ahead(o)) return true;
-    for (const o of this.pending) if (ahead(o)) return true;
+      const across = Math.abs(ox * uy - oy * ux);
+      if (across > r) continue;
+      if (ox * ux + oy * uy + Math.sqrt(r * r - across * across) > 4) return true; // still inside after the rest
+    }
     return false;
   }
 

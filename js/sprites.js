@@ -2,7 +2,7 @@
 // Every sprite is a small canvas; rotated versions are cached in 32 steps with
 // nearest-neighbour sampling so they stay crisp.
 import { SLIME_R } from './config.js';
-import { makeCanvas, hexToRgb, rgbToHex, mix, hsv } from './pixelart.js';
+import { makeCanvas, hexToRgb, rgbToHex, mix, hsv, PixBuf, canvasFromPixels, pixelsOf } from './pixelart.js';
 import { drawProjectile } from './projectile-art.js';
 
 export { makeCanvas, hexToRgb, rgbToHex, mix, hsv };
@@ -23,17 +23,16 @@ export function sprite(name, tint = null) {
 export const ROT_STEPS = 32;
 const rotCache = new WeakMap();
 
+// The rotated picture is cropped to its pixels (a turned face is mostly empty space): its
+// full size is size x size, the crop starts at (bx, by), and its centre is at (ax, ay).
 function rotate(src, ang) {
   const sw = src.width, sh = src.height;
   const size = Math.ceil(Math.hypot(sw, sh)) + 1;
-  const sctx = src.getContext('2d');
-  const sd = sctx.getImageData(0, 0, sw, sh).data;
-  const c = makeCanvas(size, size);
-  const g = c.getContext('2d');
-  const img = g.createImageData(size, size);
-  const d = img.data;
+  const sd = pixelsOf(src);
+  const d = new Uint8ClampedArray(size * size * 4);
   const cs = Math.cos(-ang), sn = Math.sin(-ang);
   const cx = size / 2, cy = size / 2, scx = sw / 2, scy = sh / 2;
+  let x0 = size, y0 = size, x1 = -1, y1 = -1;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
@@ -42,10 +41,33 @@ function rotate(src, ang) {
       const si = (sy * sw + sx) * 4, di = (y * size + x) * 4;
       if (sd[si + 3] === 0) continue;
       d[di] = sd[si]; d[di + 1] = sd[si + 1]; d[di + 2] = sd[si + 2]; d[di + 3] = sd[si + 3];
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
     }
   }
-  g.putImageData(img, 0, 0);
+  if (x1 < 0) { x0 = y0 = x1 = y1 = 0; } // nothing visible
+  const w = x1 - x0 + 1, h = y1 - y0 + 1;
+  const crop = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) crop.set(d.subarray(((y0 + y) * size + x0) * 4, ((y0 + y) * size + x1 + 1) * 4), y * w * 4);
+  const c = canvasFromPixels(w, h, crop);
+  Object.assign(c, { fullW: size, fullH: size, bx: x0, by: y0, ax: cx - x0, ay: cy - y0 });
   return c;
+}
+
+// Draws a sprite centred on (x, y), at full size or scaled by sc (cropped ones included).
+export function blit(g, img, x, y) {
+  g.drawImage(img, Math.round(x - (img.ax ?? img.width / 2)), Math.round(y - (img.ay ?? img.height / 2)));
+}
+
+export function blitScaled(g, img, x, y, sc) {
+  const fw = img.fullW ?? img.width, fh = img.fullH ?? img.height;
+  const w = Math.max(1, Math.round(fw * sc)), h = Math.max(1, Math.round(fh * sc));
+  const dx = Math.round(x - w / 2), dy = Math.round(y - h / 2);
+  if (img.fullW === undefined) { g.drawImage(img, dx, dy, w, h); return; }
+  const kx = w / fw, ky = h / fh;
+  g.drawImage(img, dx + img.bx * kx, dy + img.by * ky, img.width * kx, img.height * ky);
 }
 
 export function rotated(src, ang) {
@@ -73,19 +95,22 @@ export function slimePalette(base) {
 
 export const SQUASH = [-0.1, -0.05, 0, 0.05, 0.1];
 export const OUTLINE = 3; // comic outline, the same for every slime size
-const bodyCache = new Map();
+const bodyCache = new Map(); // colour -> [size * 10 + sqi * 2 + flash]
 
 // size: 0..2, sqi: index into SQUASH, flash: white silhouette
 export function slimeBody(color, size, sqi, flash) {
-  const key = color + size + sqi + (flash ? 'f' : '');
-  let c = bodyCache.get(key);
-  if (c) return c;
+  let arr = bodyCache.get(color);
+  if (!arr) bodyCache.set(color, (arr = []));
+  const k = size * 10 + sqi * 2 + (flash ? 1 : 0);
+  return arr[k] || (arr[k] = buildBody(color, size, sqi, flash));
+}
+
+function buildBody(color, size, sqi, flash) {
   const r = SLIME_R[size];
   const sq = SQUASH[sqi];
   const rx = r * (1 + sq), ry = r / (1 + sq);
   const dim = Math.ceil(r * 1.15) * 2 + 2;
-  c = makeCanvas(dim, dim);
-  const g = c.getContext('2d');
+  const b = new PixBuf(dim, dim);
   const cx = dim / 2, cy = dim / 2;
   const ol = OUTLINE;
   const pal = slimePalette(color);
@@ -111,36 +136,35 @@ export function slimeBody(color, size, sqi, flash) {
         if (size < 2 && sx * sx + sy * sy < 0.012) col = pal.spec; // no white dot on the smallest
         if (d > 0.62 && u + v < -0.75 && d < 0.78) col = pal.light; // rim light top-left
       }
-      g.fillStyle = col;
-      g.fillRect(x, y, 1, 1);
+      b.set(x, y, col);
     }
   }
-  bodyCache.set(key, c);
-  return c;
+  return b.canvas();
 }
 
 // Face sprites, drawn facing DOWN and scaled to the slime radius;
 // rotated at draw time around the slime centre. mode: normal | hurt | blink
-const faceBase = new Map();
+const faceBase = [];
+const FACE_MODES = { normal: 0, hurt: 1, blink: 2 };
 export function slimeFace(size, mode) {
-  const key = size + mode;
-  let c = faceBase.get(key);
-  if (c) return c;
+  const k = size * 3 + FACE_MODES[mode];
+  return faceBase[k] || (faceBase[k] = buildFace(size, mode));
+}
+
+function buildFace(size, mode) {
   const r = SLIME_R[size];
   const dim = Math.ceil(r) * 2 + 2;
-  c = makeCanvas(dim, dim);
-  const g = c.getContext('2d');
+  const b = new PixBuf(dim, dim);
   const cx = dim / 2, cy = dim / 2;
   const ellipse = (ex, ey, rx, ry, col) => {
-    g.fillStyle = col;
     for (let y = Math.floor(cy + ey - ry); y <= Math.ceil(cy + ey + ry); y++) {
       for (let x = Math.floor(cx + ex - rx); x <= Math.ceil(cx + ex + rx); x++) {
         const u = (x + 0.5 - cx - ex) / rx, v = (y + 0.5 - cy - ey) / ry;
-        if (u * u + v * v <= 1) g.fillRect(x, y, 1, 1);
+        if (u * u + v * v <= 1) b.set(x, y, col);
       }
     }
   };
-  const dot = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(Math.round(cx + x), Math.round(cy + y), w, h); };
+  const dot = (x, y, w, h, col) => b.rect(Math.round(cx + x), Math.round(cy + y), w, h, col);
   const line = (x0, y0, x1, y1, t) => {
     const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2) + 1;
     for (let i = 0; i <= n; i++) {
@@ -177,8 +201,7 @@ export function slimeFace(size, mode) {
     const mr = mw;
     for (let a = 0.15; a <= Math.PI - 0.15; a += 0.08) dot(Math.cos(a) * mr - t / 2, my - mr * 0.5 + Math.sin(a) * mr * 0.8 - t / 2, t, t, '#000');
   }
-  faceBase.set(key, c);
-  return c;
+  return b.canvas(true); // faces get rotated
 }
 
 // ---------------------------------------------------------------- hit explosion
@@ -192,7 +215,7 @@ function hash(x, y, s) {
 }
 export function hitFrame(f) {
   if (hitCache[f]) return hitCache[f];
-  const dim = 15, c = makeCanvas(dim, dim), g = c.getContext('2d');
+  const dim = 15, b = new PixBuf(dim, dim);
   const R = [3, 5, 6.5, 7, 7][f];
   for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
     const dx = x + 0.5 - 7.5, dy = y + 0.5 - 7.5;
@@ -205,11 +228,9 @@ export function hitFrame(f) {
     else if (f === 2) col = d < 0.25 ? '#fff2a0' : d < 0.55 ? (n > 0.5 ? '#ffb02a' : '#ff8a1a') : d < 0.85 ? '#d0601a' : '#8a4a20';
     else if (f === 3) { if (d < 0.35) col = n > 0.6 ? '#8a4a20' : null; else if (d < 0.75) col = n > 0.75 ? '#ff9a2a' : '#8a4a20'; else col = n > 0.45 ? '#5e3416' : null; }
     else col = d > 0.55 && n > 0.62 ? '#6a3a18' : null;
-    if (!col) continue;
-    g.fillStyle = col;
-    g.fillRect(x, y, 1, 1);
+    if (col) b.set(x, y, col);
   }
-  return (hitCache[f] = c);
+  return (hitCache[f] = b.canvas(true)); // hits get rotated
 }
 
 // Pre-builds the rotated faces and hit frames a few at a time (call next() in idle time).
@@ -224,22 +245,59 @@ export function* warmJobs() {
   }
 }
 
+// Slime bodies in a level's colours (every squash step, with and without flash) and their pop rings.
+export function* warmSlimes(colors) {
+  for (const type of colors) {
+    for (let size = 0; size < 3; size++) {
+      for (let sqi = 0; sqi < SQUASH.length; sqi++) {
+        for (const flash of [false, true]) { slimeBody(type[size], size, sqi, flash); yield; }
+      }
+      const light = slimePalette(type[size]).light, r = SLIME_R[size];
+      for (let k = Math.round(r); k <= Math.round(r * 1.53); k++) { ring(k, light); yield; }
+    }
+  }
+}
+
+// The projectile sprites of a loadout (every tint they can get) with all their rotations.
+export function* warmProjectiles(statsList) {
+  for (const st of statsList) {
+    // tints a stage can get: its own, or passed on from the stage before
+    let tints = st.tintByFan ? st.stages[0].tints : [null];
+    const stageTints = st.stages.map((s, i) => {
+      const sp = i > 0 && st.stages[i - 1].split;
+      if (sp && (sp.tint === 'index' || sp.tint === 'random')) tints = s.tints;
+      if (s.tints && tints.includes(null)) tints = [...new Set([...tints.filter(Boolean), ...s.tints])];
+      return tints;
+    });
+    for (const [i, s] of st.stages.entries()) {
+      for (const name of Array.isArray(s.sprite) ? s.sprite : [s.sprite]) {
+        for (const tint of stageTints[i]) {
+          const img = sprite(name, tint);
+          yield;
+          if (s.orient !== 'dir' && s.orient !== 'spin') continue;
+          for (let k = 1; k < ROT_STEPS; k++) { rotated(img, (k / ROT_STEPS) * Math.PI * 2); yield; }
+        }
+      }
+    }
+  }
+}
+
 // ---------------------------------------------------------------- pixel rings
-const ringCache = new Map();
+const ringCache = new Map(); // colour -> [radius]
 export function ring(r, color) {
   r = Math.max(1, Math.round(r));
-  const key = r + color;
-  let c = ringCache.get(key);
-  if (c) return c;
+  let arr = ringCache.get(color);
+  if (!arr) ringCache.set(color, (arr = []));
+  return arr[r] || (arr[r] = buildRing(r, color));
+}
+
+function buildRing(r, color) {
   const dim = r * 2 + 3;
-  c = makeCanvas(dim, dim);
-  const g = c.getContext('2d');
-  g.fillStyle = color;
+  const b = new PixBuf(dim, dim);
   const cx = dim / 2, cy = dim / 2;
   for (let y = 0; y < dim; y++) for (let x = 0; x < dim; x++) {
     const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
-    if (d <= r + 0.5 && d > r - 0.7) g.fillRect(x, y, 1, 1);
+    if (d <= r + 0.5 && d > r - 0.7) b.set(x, y, color);
   }
-  ringCache.set(key, c);
-  return c;
+  return b.canvas();
 }

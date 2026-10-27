@@ -10,7 +10,7 @@ import { loadSave, writeSave, clearSave, freshSave, testAllSave } from './save.j
 import { initAudio, sfx, setMuted, suspendAudio, resumeAudio } from './audio.js';
 import { botUpdate } from './bot.js';
 import { fmt } from './format.js';
-import { warmJobs } from './sprites.js';
+import { warmJobs, warmSlimes, warmProjectiles } from './sprites.js';
 
 const STEP = 1 / 60;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -40,7 +40,8 @@ class Game {
     this.saveT = 0;
     this.hudT = 0;
     this.ui = new UI(this);
-    this.warm = warmJobs();
+    // sprites are built ahead of time in idle moments, so nothing has to be built mid-fight
+    this.warm = [{ kind: 'base', job: warmJobs() }, { kind: 'belt', job: this.renderer.warmBelt() }];
     setMuted(this.state.muted);
     if (this.state.maxLevel > 1 || this.state.money > 0) {
       document.getElementById('tapText').textContent = `TAP TO CONTINUE - LEVEL ${this.state.level}`;
@@ -49,6 +50,7 @@ class Game {
     // title screen demo: the autopilot plays level 1
     this.world.loadLevel(1, slimeHp(1));
     this.world.setLoadout([buildStats(WEAPONS[0], 31)]);
+    this.queueWarm('slimes', warmSlimes(this.renderer.colors));
 
     this.updateSky(true);
     this.fit();
@@ -155,6 +157,7 @@ class Game {
     s.level = clamp(L, 1, s.maxLevel);
     this.loseT = 0;
     this.renderer.colors = randomSlimeColors();
+    this.queueWarm('slimes', warmSlimes(this.renderer.colors));
     this.renderer.reset();
     this.world.loadLevel(s.level, slimeHp(s.level));
     this.applyLoadout();
@@ -187,7 +190,14 @@ class Game {
 
   applyLoadout() {
     const s = this.state;
-    this.world.setLoadout(s.equipped.map((i) => buildStats(WEAPONS[i], s.levels[i])));
+    const stats = s.equipped.map((i) => buildStats(WEAPONS[i], s.levels[i]));
+    this.world.setLoadout(stats);
+    this.queueWarm('weapons', warmProjectiles(stats));
+  }
+
+  // A warm-up job goes first in line and replaces an older one of the same kind.
+  queueWarm(kind, job) {
+    this.warm = [{ kind, job }, ...this.warm.filter((w) => w.kind !== kind)];
   }
 
   handleEvents() {
@@ -353,9 +363,9 @@ class Game {
         if (this.saveT > 5) { this.saveT = 0; writeSave(this.state); }
       }
     }
-    if (this.warm) {
+    if (this.warm.length) {
       const t0 = performance.now();
-      while (performance.now() - t0 < 4) if (this.warm.next().done) { this.warm = null; break; }
+      while (this.warm.length && performance.now() - t0 < 4) if (this.warm[0].job.next().done) this.warm.shift();
     }
     const vw = innerWidth, vh = innerHeight;
     if (vw !== this.vw || vh !== this.vh) { this.vw = vw; this.vh = vh; this.fit(); }

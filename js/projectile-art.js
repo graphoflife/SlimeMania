@@ -1,7 +1,7 @@
 // Detailed projectile sprites, drawn at their final size from simple signed-distance shapes.
 // Every shape gets a dark outline, a highlight band on the side facing the light (top-left)
 // and a shade band on the other side. 'dir' sprites point up.
-import { makeCanvas, mix } from './pixelart.js';
+import { PixBuf, mix } from './pixelart.js';
 
 const LX = -0.6, LY = -0.8; // light direction
 const TAU = Math.PI * 2;
@@ -103,17 +103,14 @@ class Art {
   dots(list, col) { for (const [x, y] of list) this.dot(x, y, col); return this; }
 
   canvas() {
-    const c = makeCanvas(this.w, this.h);
-    const g = c.getContext('2d');
+    const b = new PixBuf(this.w, this.h);
     for (let y = 0; y < this.h; y++) {
       for (let x = 0; x < this.w; x++) {
         const col = this.px[y * this.w + x];
-        if (!col) continue;
-        g.fillStyle = col;
-        g.fillRect(x, y, 1, 1);
+        if (col) b.set(x, y, col);
       }
     }
-    return c;
+    return b.canvas(true); // projectiles get rotated
   }
 }
 

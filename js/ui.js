@@ -98,12 +98,14 @@ export class UI {
     this.gainIdle += dt;
     if (this.gainDirty) {
       this.gainDirty = false;
-      this.gain.textContent = '+' + fmt(this.gainSum);
-      this.gain.classList.remove('bump');
-      void this.gain.offsetWidth;
-      this.gain.classList.add('bump');
+      const text = '+' + fmt(this.gainSum);
+      if (text !== this.gainText) { this.gainText = text; this.gain.textContent = text; }
+      // restart the little bump (an animation object: no forced page layout)
+      this.gainAnim?.cancel();
+      this.gainAnim = this.gain.animate([{ transform: 'scale(1.25)' }, { transform: 'none' }], { duration: 120, easing: 'steps(3)' });
     }
-    this.gain.classList.toggle('show', this.gainIdle < 0.8);
+    const show = this.gainIdle < 0.8;
+    if (show !== this.gainShown) { this.gainShown = show; this.gain.classList.toggle('show', show); }
   }
 
   tick(dt) {
@@ -114,7 +116,8 @@ export class UI {
       const d = target - this.shownMoney;
       if (Math.abs(d) <= Math.max(1, Math.abs(target) * 1e-4)) this.shownMoney = target;
       else this.shownMoney += d * Math.min(1, dt * 12);
-      this.moneyEl.textContent = fmt(this.shownMoney);
+      const text = fmt(this.shownMoney);
+      if (text !== this.moneyText) { this.moneyText = text; this.moneyEl.textContent = text; }
     }
     const w = this.game.world;
     const wave = `WAVE ${w.waveNum}`;
@@ -122,8 +125,6 @@ export class UI {
   }
 
   bumpMoney() {
-    this.moneyPill.classList.remove('bump');
-    void this.moneyPill.offsetWidth;
     this.moneyPill.classList.add('bump');
     clearTimeout(this.bumpT);
     this.bumpT = setTimeout(() => this.moneyPill.classList.remove('bump'), 90);

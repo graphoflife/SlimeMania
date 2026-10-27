@@ -185,8 +185,6 @@ button {
   text-shadow: calc(var(--u)) 0 0 #000, calc(var(--u) * -1) 0 0 #000, 0 calc(var(--u)) 0 #000, 0 calc(var(--u) * -1) 0 #000;
 }
 #gain.show { opacity: 1; transition: none; }
-#gain.bump { animation: gainBump 0.12s steps(3); }
-@keyframes gainBump { 0% { transform: scale(1.25); } }
 
 /* ------------------------------------------------------------------ banner */
 #banner {

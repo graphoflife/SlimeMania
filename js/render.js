@@ -4,7 +4,7 @@ import {
 } from './config.js';
 import { Background } from './background.js';
 import {
-  sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas, mix,
+  sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas, mix, blit, blitScaled,
 } from './sprites.js';
 import { slimeScale } from './world.js';
 
@@ -15,6 +15,32 @@ const NIGHT_TINT = '#101848';
 const NIGHT_TINT_ALPHA = 0.25;
 const PARTY = ['#ff3a7c', '#3ad7ff', '#ffe23a', '#7dff3a', '#c04dff', '#ff8c1a', '#ffffff'];
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const HIT_LIFE = HIT_FRAMES * 0.05;
+const RING_LIFE = 0.22;
+
+// Chain belt geometry. Links sit exactly PITCH px apart on the straight runs.
+const PITCH = 4;
+const STRAIGHT = SPROCKET_RX - SPROCKET_LX;
+const LINKS = Math.round((2 * STRAIGHT + 2 * Math.PI * SPROCKET_R) / PITCH / 2) * 2;
+const LOOP = LINKS * PITCH;
+const ARC = (LOOP - 2 * STRAIGHT) / 2; // chain length around one sprocket
+// The belt looks the same again after two links, and the sprockets (4 spokes, 8 teeth) after
+// a quarter turn, so there are only BELT_PERIOD different pictures of it; each is drawn once.
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+const BELT_PERIOD = Number.isInteger(ARC / 2) ? (2 * PITCH * (ARC / 2)) / gcd(2 * PITCH, ARC / 2) : 0;
+const BELT_TOP = CHAIN_Y - SPROCKET_R - 5;  // top of the housing
+const BELT_H = H + BOTTOM_BAR + 4 - BELT_TOP;
+
+// removes the entries that are done, without making a new array
+function prune(arr, alive) {
+  let j = 0;
+  for (let i = 0; i < arr.length; i++) if (alive(arr[i])) arr[j++] = arr[i];
+  arr.length = j;
+}
+const hitAlive = (h) => h.t < HIT_LIFE;
+const ringAlive = (r) => r.t < RING_LIFE;
+const partAlive = (p) => p.t < p.life;
+const byColor = (a, b) => (a.color < b.color ? -1 : a.color > b.color ? 1 : 0);
 
 // Bright, saturated, clearly different colours (plus black and white).
 const SLIME_COLORS = [
@@ -49,17 +75,15 @@ export class Renderer {
     this.night = 0;        // 0 = day, 1 = night; eases towards nightTarget
     this.nightTarget = 0;
     this.gunSprite = buildGunSprite();
+    this.belt = [];        // cached pictures of housing + chain, by phase
   }
 
   // extra rows of sky above the playfield on tall screens
   setExtra(extra) {
-    if (extra === this.extra && this.canvas.height === H + extra + BOTTOM_BAR && this.fg) return;
+    if (extra === this.extra && this.canvas.height === H + extra + BOTTOM_BAR) return;
     this.extra = extra;
     this.canvas.height = H + extra + BOTTOM_BAR;
     this.g.imageSmoothingEnabled = false;
-    // everything in front of the landscape is drawn on its own layer (for the night tint)
-    this.fg = makeCanvas(W, this.canvas.height);
-    this.fg.getContext('2d').imageSmoothingEnabled = false;
   }
 
   reset() {
@@ -102,14 +126,22 @@ export class Renderer {
 
   // radial burst of coloured particles (fireworks, saw sparks)
   sparkle(x, y, n, colors, v0, v1) {
-    for (let i = 0; i < n && this.parts.length < 500; i++) {
+    const list = [];
+    for (let i = 0; i < n && this.parts.length + i < 500; i++) {
       const a = (i / n) * TAU + Math.random() * 0.3;
       const v = v0 + Math.random() * (v1 - v0);
-      this.parts.push({
+      list.push({
         x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 0.4 + Math.random() * 0.35,
         color: colors[Math.floor(Math.random() * colors.length)], size: Math.random() < 0.4 ? 2 : 1,
       });
     }
+    this.addParts(list);
+  }
+
+  // grouped by colour, so drawing them needs only a few colour changes
+  addParts(list) {
+    list.sort(byColor);
+    for (const p of list) this.parts.push(p);
   }
 
   // ring + droplets in the slime colour
@@ -118,16 +150,18 @@ export class Renderer {
     const pal = slimePalette(color);
     this.rings.push({ x, y, r, t: 0, color: pal.light });
     const n = [16, 10, 7][size];
-    for (let i = 0; i < n && this.parts.length < 400; i++) {
+    const list = [];
+    for (let i = 0; i < n && this.parts.length + i < 400; i++) {
       const a = Math.random() * TAU;
       const v = (40 + Math.random() * 90) * (size === 2 ? 1.2 : 1);
-      this.parts.push({
+      list.push({
         x: x + Math.cos(a) * r * 0.6, y: y + Math.sin(a) * r * 0.6,
         vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 0.3 + Math.random() * 0.35,
         color: Math.random() < 0.3 ? pal.light : Math.random() < 0.5 ? pal.shade : pal.base,
         size: Math.random() < 0.3 ? 2 : 1,
       });
     }
+    this.addParts(list);
   }
 
   update(dt) {
@@ -136,31 +170,29 @@ export class Renderer {
     const step = dt * 0.6; // ~1.7 s cross-fade
     this.night += Math.max(-step, Math.min(step, this.nightTarget - this.night));
     for (const h of this.hits) h.t += dt;
-    this.hits = this.hits.filter((h) => h.t < HIT_FRAMES * 0.05);
+    prune(this.hits, hitAlive);
     for (const r of this.rings) r.t += dt;
-    this.rings = this.rings.filter((r) => r.t < 0.22);
+    prune(this.rings, ringAlive);
+    const k = Math.exp(-4 * dt);
     for (const p of this.parts) {
       p.t += dt;
-      const k = Math.exp(-4 * dt);
       p.vx *= k; p.vy *= k;
       p.x += p.vx * dt; p.y += p.vy * dt;
     }
-    this.parts = this.parts.filter((p) => p.t < p.life);
+    prune(this.parts, partAlive);
     this.shake = Math.max(0, this.shake - dt * 8);
     this.flash = Math.max(0, this.flash - dt * 2.2);
   }
 
   // ---------------------------------------------------------------- drawing
+  // The scene is drawn first onto the empty canvas, the landscape last, behind it. So the
+  // night tint can be laid over the scene alone, without a separate layer.
   draw(world, opts = {}) {
-    if (!this.fg) this.setExtra(this.extra);
-    const main = this.g;
-    const ex = this.extra;
-    main.setTransform(1, 0, 0, 1, 0, 0);
-    this.bg.draw(main, ex, this.night);
-    // the foreground goes onto its own layer, all drawing helpers use this.g
-    const g = (this.g = this.fg.getContext('2d'));
+    if (this.canvas.height !== H + this.extra + BOTTOM_BAR) this.setExtra(this.extra);
+    const g = this.g;
+    const ex = this.extra, height = this.canvas.height;
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, W, this.fg.height);
+    g.clearRect(0, 0, W, height);
     const sx = Math.round((Math.random() * 2 - 1) * this.shake);
     const sy = Math.round((Math.random() * 2 - 1) * this.shake);
     g.setTransform(1, 0, 0, 1, sx, sy + ex);
@@ -174,9 +206,8 @@ export class Renderer {
     }
 
     this.drawSlimes(world);
-    this.drawHousing();
     const gx = Math.round(world.gun.x); // gun and chain move together in whole pixels
-    this.drawChain(gx);
+    this.drawBelt(gx);
     this.drawGun(gx, world.gun, world.emitters.length);
     this.drawProjectiles(world);
     this.drawEffects();
@@ -186,23 +217,24 @@ export class Renderer {
       g.globalCompositeOperation = 'source-atop';
       g.globalAlpha = NIGHT_TINT_ALPHA * this.night;
       g.fillStyle = NIGHT_TINT;
-      g.fillRect(0, 0, W, this.fg.height);
+      g.fillRect(0, 0, W, height);
       g.globalAlpha = 1;
-      g.globalCompositeOperation = 'source-over';
     }
-    this.g = main;
-    main.drawImage(this.fg, 0, 0);
+    // the landscape goes behind everything drawn so far
+    g.globalCompositeOperation = 'destination-over';
+    this.bg.draw(g, ex, this.night);
+    g.globalCompositeOperation = 'source-over';
     if (this.flash > 0) {
-      main.globalAlpha = this.flash * 0.45;
-      main.fillStyle = this.flashColor;
-      main.fillRect(0, 0, W, this.canvas.height);
-      main.globalAlpha = 1;
+      g.globalAlpha = this.flash * 0.45;
+      g.fillStyle = this.flashColor;
+      g.fillRect(0, 0, W, height);
+      g.globalAlpha = 1;
     }
     if (opts.dim) {
-      main.globalAlpha = opts.dim;
-      main.fillStyle = '#140f24';
-      main.fillRect(0, 0, W, this.canvas.height);
-      main.globalAlpha = 1;
+      g.globalAlpha = opts.dim;
+      g.fillStyle = '#140f24';
+      g.fillRect(0, 0, W, height);
+      g.globalAlpha = 1;
     }
   }
 
@@ -218,14 +250,12 @@ export class Renderer {
         const face = rotated(slimeFace(size, mode), s.face + s.kick - Math.PI / 2);
         const sc = slimeScale(s);
         if (sc === 1) {
-          g.drawImage(body, Math.round(s.x - body.width / 2), Math.round(s.y - body.height / 2));
-          g.drawImage(face, Math.round(s.x - face.width / 2), Math.round(s.y - face.height / 2));
+          blit(g, body, s.x, s.y);
+          blit(g, face, s.x, s.y);
         } else if (sc > 0.02) {
           // growing into existence
-          for (const img of [body, face]) {
-            const w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
-            g.drawImage(img, Math.round(s.x - w / 2), Math.round(s.y - h / 2), w, h);
-          }
+          blitScaled(g, body, s.x, s.y, sc);
+          blitScaled(g, face, s.x, s.y, sc);
         }
       }
     }
@@ -244,11 +274,13 @@ export class Renderer {
         else f = Math.floor(p.age * st.anim);
         name = name[clamp(f, 0, name.length - 1) % name.length];
       }
-      let img = sprite(name, p.tint);
+      // the sprite is looked up once per projectile (and again when its animation frame changes)
+      if (p.sprName !== name) { p.sprName = name; p.spr = sprite(name, p.tint); }
+      let img = p.spr;
       if (st.orient === 'dir') img = rotated(img, Math.atan2(p.vy, p.vx) + Math.PI / 2);
       else if (st.orient === 'spin') img = rotated(img, p.ang);
       if (name === 'flame3') g.globalAlpha = 0.6;
-      g.drawImage(img, Math.round(p.x - img.width / 2), Math.round(p.y - img.height / 2));
+      blit(g, img, p.x, p.y);
       g.globalAlpha = 1;
     }
   }
@@ -261,44 +293,44 @@ export class Renderer {
     const len = st.trailFrac ? p.dist * st.trailFrac : Math.min(st.trailLen, p.dist);
     if (len < 2) return;
     const x1 = p.x - ux * 3, y1 = p.y - uy * 3;           // start just behind the sprite centre
-    const at = (k, off = 0) => [p.x - ux * len * k + nx * off, p.y - uy * len * k + ny * off];
-    const line = (k0, k1, off, color, w) => { const [a, b] = at(k0, off), [c, d] = at(k1, off); pixLine(g, a, b, c, d, color, w); };
+    const ex = p.x - ux * len, ey = p.y - uy * len;       // end of the tail
+    const x = p.x, y = p.y;
     switch (st.trail) {
       case 'laser':
-        pixLine(g, x1, y1, ...at(1), '#ff2a3c', 3);
-        pixLine(g, x1, y1, ...at(1), '#ffd0d6', 1);
+        pixLine(g, x1, y1, ex, ey, '#ff2a3c', 3);
+        pixLine(g, x1, y1, ex, ey, '#ffd0d6', 1);
         break;
       case 'tint':
-        pixLine(g, x1, y1, ...at(1), p.tint || '#ffffff', 5);
-        pixLine(g, x1, y1, ...at(0.6), '#ffffff', 1);
+        pixLine(g, x1, y1, ex, ey, p.tint || '#ffffff', 5);
+        pixLine(g, x1, y1, x - ux * len * 0.6, y - uy * len * 0.6, '#ffffff', 1);
         break;
       case 'staff':
         g.globalAlpha = 0.8;
-        for (let i = 0; i < 5; i++) line(0.15, 1, (i - 2) * 2, '#2a2d38', 1);
+        for (let i = 0; i < 5; i++) tailLine(g, x, y, ux, uy, len, 0.15, 1, (i - 2) * 2, '#2a2d38', 1);
         g.globalAlpha = 1;
         break;
       case 'wind':
         g.globalAlpha = 0.75;
-        line(0.25, 0.75, 2, '#ffffff', 1);
-        line(0.4, 1, -2, '#ffffff', 1);
-        line(0.55, 0.9, 0, '#e8f4ff', 1);
+        tailLine(g, x, y, ux, uy, len, 0.25, 0.75, 2, '#ffffff', 1);
+        tailLine(g, x, y, ux, uy, len, 0.4, 1, -2, '#ffffff', 1);
+        tailLine(g, x, y, ux, uy, len, 0.55, 0.9, 0, '#e8f4ff', 1);
         g.globalAlpha = 1;
         break;
       case 'fire':
-        line(0.1, 0.45, 0, '#ffe23a', 4);
-        line(0.45, 0.75, 0, '#ff8c1a', 3);
-        line(0.75, 1, 0, '#e8301a', 2);
+        tailLine(g, x, y, ux, uy, len, 0.1, 0.45, 0, '#ffe23a', 4);
+        tailLine(g, x, y, ux, uy, len, 0.45, 0.75, 0, '#ff8c1a', 3);
+        tailLine(g, x, y, ux, uy, len, 0.75, 1, 0, '#e8301a', 2);
         break;
       case 'smoke':
         g.globalAlpha = 0.7;
-        for (let k = 0.25; k <= 1; k += 0.25) { const [a, b] = at(k); discFill(g, a, b, 1.2 + k, '#c8ccd6'); }
+        for (let k = 0.25; k <= 1; k += 0.25) discFill(g, x - ux * len * k, y - uy * len * k, 1.2 + k, '#c8ccd6');
         g.globalAlpha = 1;
         break;
       case 'star': {
         // shooting star in the star's colour: a soft wide glow around a crisp bright core,
         // with little stars twinkling around it
-        const t = p.tint || '#ffd23a', light = mix(t, '#ffffff', 0.55);
-        const [ex, ey] = at(1), [mx, my] = at(0.6);
+        const t = p.tint || '#ffd23a', light = lighter(t);
+        const mx = x - ux * len * 0.6, my = y - uy * len * 0.6;
         g.lineCap = 'round';
         g.strokeStyle = t;
         g.globalAlpha = 0.22;
@@ -308,13 +340,13 @@ export class Renderer {
         g.lineWidth = 6;
         g.beginPath(); g.moveTo(x1, y1); g.lineTo(mx, my); g.stroke();
         g.globalAlpha = 1;
-        line(0.05, 0.45, 0, light, 3);
-        line(0.45, 0.8, 0, t, 2);
-        line(0.05, 0.3, 0, '#ffffff', 1);
+        tailLine(g, x, y, ux, uy, len, 0.05, 0.45, 0, light, 3);
+        tailLine(g, x, y, ux, uy, len, 0.45, 0.8, 0, t, 2);
+        tailLine(g, x, y, ux, uy, len, 0.05, 0.3, 0, '#ffffff', 1);
         for (let k = 0.12; k <= 1; k += 0.12) {
           if (Math.random() < 0.3) continue;
-          const [a, b] = at(k, (Math.random() * 2 - 1) * 5);
-          const X = Math.round(a), Y = Math.round(b);
+          const off = (Math.random() * 2 - 1) * 5;
+          const X = Math.round(x - ux * len * k + nx * off), Y = Math.round(y - uy * len * k + ny * off);
           g.fillStyle = Math.random() < 0.5 ? '#ffffff' : light;
           g.fillRect(X, Y - 1, 1, 3);
           g.fillRect(X - 1, Y, 3, 1);
@@ -340,24 +372,47 @@ export class Renderer {
     const g = this.g;
     for (const r of this.rings) {
       const img = ring(r.r * (1 + r.t * 2.4), r.color);
-      g.globalAlpha = 1 - r.t / 0.22;
+      g.globalAlpha = 1 - r.t / RING_LIFE;
       g.drawImage(img, Math.round(r.x - img.width / 2), Math.round(r.y - img.height / 2));
     }
     g.globalAlpha = 1;
+    let last = null;
     for (const p of this.parts) {
-      g.fillStyle = p.t > p.life * 0.7 && Math.floor(p.t * 30) % 2 ? '#000000' : p.color;
+      const col = p.t > p.life * 0.7 && Math.floor(p.t * 30) % 2 ? '#000000' : p.color;
+      if (col !== last) { g.fillStyle = col; last = col; }
       g.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
     }
     for (const h of this.hits) {
       const f = Math.min(HIT_FRAMES - 1, Math.floor(h.t / 0.05));
-      const img = rotated(hitFrame(f), h.rot);
-      const w = Math.round(img.width * h.sc), hh = Math.round(img.height * h.sc);
-      g.drawImage(img, Math.round(h.x - w / 2), Math.round(h.y - hh / 2), w, hh);
+      blitScaled(g, rotated(hitFrame(f), h.rot), h.x, h.y, h.sc);
     }
     g.globalAlpha = 1;
   }
 
   // ---------------------------------------------------------------- chain belt & gun
+  // Housing, chain and sprockets: one cached picture per phase of the belt.
+  drawBelt(offset) {
+    if (!BELT_PERIOD) { this.drawHousing(); this.drawChain(offset); return; }
+    const k = ((offset % BELT_PERIOD) + BELT_PERIOD) % BELT_PERIOD;
+    this.g.drawImage(this.belt[k] || this.beltPicture(k), -4, BELT_TOP);
+  }
+
+  beltPicture(k) {
+    const c = makeCanvas(W + 8, BELT_H);
+    const keep = this.g;
+    this.g = c.getContext('2d');
+    this.g.translate(4, -BELT_TOP);
+    this.drawHousing();
+    this.drawChain(k);
+    this.g = keep;
+    return (this.belt[k] = c);
+  }
+
+  // builds the belt pictures ahead of time (warm-up job)
+  *warmBelt() {
+    for (let k = 0; k < BELT_PERIOD; k++) { if (!this.belt[k]) this.beltPicture(k); yield; }
+  }
+
   drawHousing() {
     const g = this.g;
     const top = CHAIN_Y - SPROCKET_R - 5;
@@ -383,11 +438,7 @@ export class Renderer {
     const L = SPROCKET_LX, R = SPROCKET_RX, CY = CHAIN_Y, RR = SPROCKET_R;
     // Links sit exactly 4 px apart on the straight runs, so a 1 px gun move shifts every link
     // by exactly 1 px (no jitter). The arcs around the sprockets absorb the remainder.
-    const PITCH = 4;
-    const straight = R - L;
-    const N = Math.round((2 * straight + 2 * Math.PI * RR) / PITCH / 2) * 2;
-    const total = N * PITCH;
-    const half = (total - 2 * straight) / 2;
+    const straight = STRAIGHT, N = LINKS, total = LOOP, half = ARC;
     const pos = (s) => {
       s = ((s % total) + total) % total;
       if (s < straight) return [L + s, CY - RR];
@@ -503,21 +554,44 @@ function buildGunSprite() {
   return c;
 }
 
+// Pixel line of w x w squares (Bresenham, at most 200 squares). Squares in a straight row are
+// filled as one rectangle: the same pixels with far fewer draw calls.
 function pixLine(g, x0, y0, x1, y1, color, w = 1) {
   g.fillStyle = color;
   const o = Math.floor(w / 2);
   x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
   const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  const steep = -dy > dx;
   let err = dx + dy;
-  for (let n = 0; n < 200; n++) {
-    g.fillRect(x0 - o, y0 - o, w, w);
-    if (x0 === x1 && y0 === y1) break;
+  let rx = x0, ry = y0; // first square of the current row
+  for (let n = 1; n < 200 && (x0 !== x1 || y0 !== y1); n++) {
     const e2 = 2 * err;
-    if (e2 >= dy) { err += dy; x0 += sx; }
-    if (e2 <= dx) { err += dx; y0 += sy; }
+    let nx = x0, ny = y0;
+    if (e2 >= dy) { err += dy; nx += sx; }
+    if (e2 <= dx) { err += dx; ny += sy; }
+    if (steep ? nx !== rx : ny !== ry) {
+      g.fillRect(Math.min(rx, x0) - o, Math.min(ry, y0) - o, Math.abs(x0 - rx) + w, Math.abs(y0 - ry) + w);
+      rx = nx; ry = ny;
+    }
+    x0 = nx; y0 = ny;
   }
+  g.fillRect(Math.min(rx, x0) - o, Math.min(ry, y0) - o, Math.abs(x0 - rx) + w, Math.abs(y0 - ry) + w);
 }
+
+// line along a projectile's tail, from fraction k0 to k1 of its length, off px to the side
+function tailLine(g, x, y, ux, uy, len, k0, k1, off, color, w) {
+  const ox = -uy * off, oy = ux * off;
+  pixLine(g, x - ux * len * k0 + ox, y - uy * len * k0 + oy, x - ux * len * k1 + ox, y - uy * len * k1 + oy, color, w);
+}
+
+const lightCache = new Map();
+function lighter(c) {
+  let l = lightCache.get(c);
+  if (!l) lightCache.set(c, (l = mix(c, '#ffffff', 0.55)));
+  return l;
+}
+
 
 function discFill(g, cx, cy, r, color) {
   g.fillStyle = color;
