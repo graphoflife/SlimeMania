@@ -11,6 +11,8 @@
 //             fanOrder: the fan position (from the left) of each shot of a pulse, in firing order.
 //             beam: the shots of a pulse share one angle and get evenly stepped speeds.
 //   (trailFrac: tail length as a fraction of the distance flown, instead of trailLen)
+//   dumpFamily: when a projectile gives its remaining hits to the last slime it can hit,
+//             the damage of its sub- and sub-sub-projectiles lands there too (no split).
 //
 // Stage parameters (stage 0 = the projectile, 1 = sub projectiles, 2 = sub-sub)
 //   share     fraction of the total damage carried by this stage
@@ -148,7 +150,7 @@ export const WEAPONS = [
     stages: [{ sprite: 'nail', recoil: 1.3, rotKick: 5 }],
   },
   {
-    id: 'grenade', name: 'Grenade',
+    id: 'grenade', name: 'Grenade', dumpFamily: true,
     interval: U(1.0, 0.15), count: 2, pulse: U(0.3, 0.05),
     speed: U(600, 30), angle: U(0, 6),
     stages: [
@@ -194,7 +196,7 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'bigbomb', name: 'Bigger Bomb',
+    id: 'bigbomb', name: 'Bigger Bomb', dumpFamily: true,
     interval: U(1.2, 0.2), count: 1, pulse: U(0),
     speed: U(570), angle: U(0, 4),
     stages: [
@@ -236,7 +238,7 @@ export const WEAPONS = [
     stages: [{ sprite: 'duck', orient: 'spin', spin: [5, 8], hits: 4, rest: 0.033, recoil: 7.3, rotKick: 35 }],
   },
   {
-    id: 'meteor', name: 'Meteor',
+    id: 'meteor', name: 'Meteor', dumpFamily: true,
     interval: U(1.0, 0.2), count: 1, pulse: U(0),
     speed: U(570, 15), angle: U(0, 6),
     stages: [
@@ -307,10 +309,15 @@ export function buildStats(def, level, nominalDps) {
     if (i > 0) mult *= def.stages[i - 1].split.count;
     return { ...s, dmg: family * s.share / mult / s.hits };
   });
+  // damage carried by everything one projectile of a stage would split into
+  for (let i = stages.length - 1; i >= 0; i--) {
+    const c = stages[i + 1];
+    stages[i].below = c ? stages[i].split.count * (c.dmg * c.hits + c.below) : 0;
+  }
   return {
     id: def.id, def, level, dps, interval, pulse, stages,
     count: def.count, speed: def.speed, angle: def.angle, fan: def.fan, sweep: def.sweep, tintByFan: def.tintByFan,
-    beam: def.beam, fanOrder: def.fanOrder,
+    beam: def.beam, fanOrder: def.fanOrder, dumpFamily: def.dumpFamily,
   };
 }
 

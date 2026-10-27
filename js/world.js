@@ -502,8 +502,10 @@ export class World {
 
   // All remaining hits of a projectile land on one slime at once; then it is used up.
   deliverRest(p, into, x, y, ignore = -1) {
-    if (into && p.hits > 0) {
-      const extra = p.s.dmg * p.hits;
+    // with dumpFamily the sub-projectiles do not split off: their damage lands here as well
+    const family = p.w.dumpFamily && p.s.split && into;
+    if (into && (p.hits > 0 || family)) {
+      const extra = p.s.dmg * p.hits + (family ? p.s.below : 0);
       const left = into.hp;
       into.hp -= extra;
       this.dealt += Math.min(extra, left);
@@ -515,7 +517,8 @@ export class World {
       if (into.hp <= 1e-9 * into.maxHp) this.killSlime(into);
     }
     p.hits = 0;
-    if (p.s.split) this.split(p, x, y, ignore);
+    if (family) { if (p.s.split.fx) this.ev('split', { x, y, fx: p.s.split.fx }); }
+    else if (p.s.split) this.split(p, x, y, ignore);
     p.dead = true;
   }
 
