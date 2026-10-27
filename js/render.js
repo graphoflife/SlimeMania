@@ -294,8 +294,13 @@ export class Renderer {
         for (let k = 0.25; k <= 1; k += 0.25) { const [a, b] = at(k); discFill(g, a, b, 1.2 + k, '#c8ccd6'); }
         g.globalAlpha = 1;
         break;
-      case 'sparkle':
-        // twinkling little stars along the tail
+      case 'star':
+        // shooting star: a glowing streak that tapers from white-gold to orange,
+        // with little stars twinkling around it
+        line(0.05, 0.35, 0, '#fff7b0', 5);
+        line(0.35, 0.65, 0, '#ffe23a', 3);
+        line(0.65, 1, 0, '#ff9a1a', 1);
+        line(0.05, 0.3, 0, '#ffffff', 1);
         for (let k = 0.15; k <= 1; k += 0.17) {
           if (Math.random() < 0.3) continue;
           const [a, b] = at(k, (Math.random() * 2 - 1) * 3);

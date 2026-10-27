@@ -17,7 +17,7 @@
 //   rest      resting time between two hits
 //   recoil    push on the slime per hit (px/s for a big slime)
 //   rotKick   max random instant rotation of the slime per hit (degrees)
-//   trail     tail look: bolt | laser | wind | staff | fire | tint | sparkle | smoke (trailLen px)
+//   trail     tail look: bolt | laser | wind | staff | fire | tint | star | smoke (trailLen px)
 //   split     sub projectiles released where the last hit lands:
 //             { count, mode: 'burst' (spread around straight up) | 'cone' | 'fan' (around the
 //               parent), angle, speed | speedFactor, tint, fx (explosion look) }
@@ -263,11 +263,11 @@ export const WEAPONS = [
     interval: U(1.0, 0.2), count: 1, pulse: U(0),
     speed: U(600), angle: U(0, 4),
     stages: [
-      { sprite: 'star_big', orient: 'spin', spin: [4, 6], trail: 'sparkle', trailLen: 34, share: 0.2, hits: 4, rest: 0.033, recoil: 3.3, rotKick: 14,
+      { sprite: 'star_big', orient: 'spin', spin: [4, 6], trail: 'star', trailLen: 44, share: 0.2, hits: 8, rest: 0.033, recoil: 3.3, rotKick: 14,
         split: { count: 8, mode: 'burst', angle: 75, speed: [570, 690], fx: 'nova' } },
-      { sprite: 'star', orient: 'spin', spin: [6, 10], trail: 'sparkle', trailLen: 16, share: 0.4, hits: 2, rest: 0.033, recoil: 2, rotKick: 10,
+      { sprite: 'star', orient: 'spin', spin: [6, 10], trail: 'star', trailLen: 22, share: 0.4, hits: 4, rest: 0.033, recoil: 2, rotKick: 10,
         split: { count: 5, mode: 'burst', angle: 60, speed: [570, 690], fx: 'boom_s' } },
-      { sprite: 'spark_w', orient: 'none', share: 0.4, hits: 2, rest: 0.027, recoil: 1.3, rotKick: 8 },
+      { sprite: 'spark_w', orient: 'none', share: 0.4, hits: 4, rest: 0.027, recoil: 1.3, rotKick: 8 },
     ],
   },
 ];
