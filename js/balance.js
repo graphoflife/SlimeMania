@@ -4,7 +4,7 @@ export const BALANCE_LEVELS = [1,11,21,31];
 export const BALANCE = {
   mg: [1, 1, 1, 1],
   shotgun: [1.067, 0.947, 1.422, 1.289],
-  water: [1, 1, 1.016, 1.183],
+  water: [1, 1, 1.021, 1.112],
   shuriken: [0.969, 0.969, 1.165, 1.01],
   arrows: [0.888, 0.959, 1.081, 0.959],
   leaves: [1.067, 1.059, 1.249, 1.202],

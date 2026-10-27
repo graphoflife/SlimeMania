@@ -61,7 +61,7 @@ export const WEAPONS = [
     id: 'water', name: 'Water Droplets',
     // a wide spread of speeds stretches every burst into a long shower
     interval: U(0.8, 0.08), count: 10, pulse: U(0.2, 0.02),
-    speed: U(950, 600), angle: N(0, 4),
+    speed: U(950, 300), angle: N(0, 4),
     stages: [{ sprite: 'drop', recoil: 0.7, rotKick: 4 }],
   },
   {
