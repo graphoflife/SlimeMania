@@ -486,7 +486,7 @@ export class World {
     if (killed) this.killSlime(sl);
     p.hits--;
     this.usedHits++;
-    p.rest = s.rest;
+    p.rest = Array.isArray(s.rest) ? range(s.rest, rng) : s.rest;
     p.lastHit = killed ? this.nearestChild(hx, hy) : sl;
     // No wasted hits: unless the projectile is sure to land another hit, the remaining hits
     // land right now (on this slime, or on one of its children if this hit popped it).

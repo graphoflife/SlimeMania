@@ -15,7 +15,7 @@
 // Stage parameters (stage 0 = the projectile, 1 = sub projectiles, 2 = sub-sub)
 //   share     fraction of the total damage carried by this stage
 //   hits      how many times it can hit; each hit deals 1/hits of its damage
-//   rest      resting time between two hits
+//   rest      resting time between two hits (a number, or [min, max] rolled before every hit)
 //   recoil    push on the slime per hit (px/s for a big slime)
 //   rotKick   max random instant rotation of the slime per hit (degrees)
 //   trail     tail look: bolt | laser | wind | staff | fire | tint | star | smoke (trailLen px)
@@ -251,7 +251,7 @@ export const WEAPONS = [
     id: 'rainbow', name: 'Rainbow',
     interval: U(0.2), count: 6, pulse: U(0), sweep: true, tintByFan: true,
     speed: U(840), angle: U(0, 12),
-    stages: [{ sprite: 'rainbow', tints: TINTS.pastel, trail: 'tint', trailLen: 84, hits: 3, rest: 0.03, recoil: 1.3, rotKick: 8 }],
+    stages: [{ sprite: 'rainbow', tints: TINTS.pastel, trail: 'tint', trailLen: 84, hits: 3, rest: [0.02, 0.15], recoil: 1.3, rotKick: 8 }],
   },
   {
     id: 'nova', name: 'Supernova',
