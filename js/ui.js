@@ -8,6 +8,23 @@ import { sfx, upgradeBlip } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
 
+// Small pixel icons for buttons, drawn as crisp SVG from ascii maps.
+const ICONS = {
+  cart: ['XX..........', '.X..........', '.XXXXXXXXXXX', '.X.X.X.X.X.X', '..XXXXXXXXX.', '..X.X.X.X.X.',
+    '...XXXXXXX..', '...X.....X..', '..XXX...XXX.', '...X.....X..'],
+  gear: ['....XX....', '.X.XXXX.X.', '..XXXXXX..', '.XXX..XXX.', 'XXX....XXX', 'XXX....XXX', '.XXX..XXX.',
+    '..XXXXXX..', '.X.XXXX.X.', '....XX....'],
+  full: ['XXXX..XXXX', 'X........X', 'X........X', 'X........X', '..........', '..........', 'X........X',
+    'X........X', 'X........X', 'XXXX..XXXX'],
+  cross: ['XX......XX', 'XXX....XXX', '.XXX..XXX.', '..XXXXXX..', '...XXXX...', '...XXXX...', '..XXXXXX..',
+    '.XXX..XXX.', 'XXX....XXX', 'XX......XX'],
+};
+function pixIcon(rows) {
+  let rects = '';
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === 'X') rects += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }));
+  return `<svg viewBox="0 0 ${rows[0].length} ${rows.length}" shape-rendering="crispEdges" fill="currentColor">${rects}</svg>`;
+}
+
 function iconCanvas(def, silhouette) {
   const st = def.stages[0];
   const name = Array.isArray(st.sprite) ? st.sprite[0] : st.sprite;
@@ -44,6 +61,7 @@ export class UI {
     this.gainSum = 0;
     this.gainIdle = 0;
 
+    for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = pixIcon(ICONS[el.dataset.icon]);
     $('btnShop').addEventListener('click', () => { sfx('click'); game.openShop(); });
     $('shopClose').addEventListener('click', () => { sfx('click'); game.closeShop(); });
     if (document.fullscreenEnabled) $('btnFull').addEventListener('click', () => { sfx('click'); game.toggleFullscreen(); });
@@ -51,7 +69,15 @@ export class UI {
     this.shop.addEventListener('pointerdown', (e) => { if (e.target === this.shop) game.closeShop(); });
     $('lvPrev').addEventListener('click', () => { sfx('click'); game.setLevel(game.state.level - 1); });
     $('lvNext').addEventListener('click', () => { sfx('click'); game.setLevel(game.state.level + 1); });
-    $('btnMute').addEventListener('click', () => game.toggleMute());
+    $('btnSettings').addEventListener('click', () => { sfx('click'); this.refreshSettings(); $('settings').classList.remove('hidden'); });
+    $('settingsClose').addEventListener('click', () => { sfx('click'); $('settings').classList.add('hidden'); });
+    $('btnReset').addEventListener('click', () => { sfx('click'); $('confirm').classList.remove('hidden'); });
+    for (const b of document.querySelectorAll('[data-sky]')) {
+      b.addEventListener('click', () => { sfx('click'); game.setSky(b.dataset.sky); });
+    }
+    for (const b of document.querySelectorAll('[data-sound]')) {
+      b.addEventListener('click', () => game.setSound(b.dataset.sound === 'on'));
+    }
     $('confirmNo').addEventListener('click', () => { sfx('click'); $('confirm').classList.add('hidden'); });
     $('confirmYes').addEventListener('click', () => game.resetProgress());
     this.buildShop();
@@ -109,7 +135,6 @@ export class UI {
     $('lvPrev').disabled = s.level <= 1;
     $('lvNext').disabled = s.level >= s.maxLevel;
     $('lvNext').classList.toggle('glow', s.level === s.maxLevel - 1);
-    $('btnMute').classList.toggle('muted', s.muted);
     const next = this.nextWeapon();
     $('btnShop').classList.toggle('attn', next >= 0 && s.money >= weaponPrice(next));
   }
@@ -175,17 +200,6 @@ export class UI {
       this.list.appendChild(el);
       return card;
     });
-    const foot = document.createElement('div');
-    foot.className = 'list-foot';
-    foot.innerHTML = `
-      <div class="sky-set"><span>SKY</span><button data-sky="auto">AUTO</button><button data-sky="day">DAY</button><button data-sky="night">NIGHT</button></div>
-      <button class="btn danger">RESET GAME</button>`;
-    for (const b of foot.querySelectorAll('[data-sky]')) {
-      b.addEventListener('click', () => { sfx('click'); this.game.setSky(b.dataset.sky); });
-    }
-    foot.querySelector('.danger').addEventListener('click', () => { sfx('click'); $('confirm').classList.remove('hidden'); });
-    this.skyButtons = foot.querySelectorAll('[data-sky]');
-    this.list.appendChild(foot);
   }
 
   bindHold(btn, action) {
@@ -224,15 +238,17 @@ export class UI {
   closeShop() {
     this.shop.classList.add('hidden');
     $('confirm').classList.add('hidden');
+    $('settings').classList.add('hidden');
   }
   get shopOpen() { return !this.shop.classList.contains('hidden'); }
 
-  refreshSky() {
-    for (const b of this.skyButtons) b.classList.toggle('on', b.dataset.sky === this.game.state.sky);
+  refreshSettings() {
+    const s = this.game.state;
+    for (const b of document.querySelectorAll('[data-sky]')) b.classList.toggle('on', b.dataset.sky === s.sky);
+    for (const b of document.querySelectorAll('[data-sound]')) b.classList.toggle('on', (b.dataset.sound === 'off') === !!s.muted);
   }
 
   refreshShop() {
-    this.refreshSky();
     const s = this.game.state;
     $('shopMoney').textContent = fmt(s.money);
     $('eqCount').textContent = `${s.equipped.length}/${MAX_EQUIPPED}`;

@@ -175,7 +175,7 @@ class Game {
   setSky(mode) {
     this.state.sky = mode;
     this.updateSky();
-    this.ui.refreshSky();
+    this.ui.refreshSettings();
     writeSave(this.state);
   }
 
@@ -299,11 +299,11 @@ class Game {
     this.ui.refreshShop();
   }
 
-  toggleMute() {
-    this.state.muted = !this.state.muted;
-    setMuted(this.state.muted);
-    if (!this.state.muted) { initAudio(); sfx('click'); }
-    this.ui.updateHud();
+  setSound(on) {
+    this.state.muted = !on;
+    setMuted(!on);
+    if (on) { initAudio(); sfx('click'); }
+    this.ui.refreshSettings();
     writeSave(this.state);
   }
 

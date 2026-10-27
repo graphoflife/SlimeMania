@@ -28,8 +28,7 @@
       <button id="lvNext" class="arrow" aria-label="Next level"><i class="tri right"></i></button>
     </div>
     <div id="hudRight">
-      <button id="btnShop" class="btn shopBtn" aria-label="Armory">SHOP</button>
-      <button id="btnMute" class="btn icon" aria-label="Sound"><i class="note"></i></button>
+      <button id="btnShop" class="btn shopBtn" aria-label="Shop"><i class="px" data-icon="cart"></i></button>
     </div>
   </div>
 
@@ -42,13 +41,27 @@
       <div class="shop-head">
         <div class="shop-title">ARMORY</div>
         <div class="shop-money pill"><i class="coin"></i><span id="shopMoney">0</span></div>
-        <button id="btnFull" class="btn icon" aria-label="Fullscreen"><i class="fs"></i></button>
-        <button id="shopClose" class="btn close" aria-label="Close">X</button>
       </div>
       <div class="shop-sub"><span>EQUIPPED <b id="eqCount">1/3</b></span><span>TOTAL DPS <b id="totalDps">0</b></span></div>
       <div class="slots" id="slots"></div>
       <div class="shop-list" id="shopList"></div>
-      <div class="shop-foot"><span>TAP A WEAPON TO EQUIP · HOLD ▲ FOR TURBO</span></div>
+      <div class="shop-foot">
+        <div class="shop-hint">TAP A WEAPON TO EQUIP · HOLD ▲ FOR TURBO</div>
+        <div class="shop-btns">
+          <button id="btnSettings" class="btn big icon" aria-label="Settings"><i class="px" data-icon="gear"></i></button>
+          <button id="btnFull" class="btn big icon" aria-label="Fullscreen"><i class="px" data-icon="full"></i></button>
+          <button id="shopClose" class="btn big close" aria-label="Close"><i class="px" data-icon="cross"></i>CLOSE</button>
+        </div>
+      </div>
+    </div>
+    <div id="settings" class="hidden">
+      <div class="confirm-box settings-box">
+        <div class="c-title">SETTINGS</div>
+        <div class="set-row"><span>SOUND</span><div class="seg"><button data-sound="on">ON</button><button data-sound="off">OFF</button></div></div>
+        <div class="set-row"><span>SKY</span><div class="seg"><button data-sky="auto">AUTO</button><button data-sky="day">DAY</button><button data-sky="night">NIGHT</button></div></div>
+        <div class="set-row center"><button id="btnReset" class="btn danger">RESET GAME</button></div>
+        <div class="set-row center"><button id="settingsClose" class="btn big">BACK</button></div>
+      </div>
     </div>
     <div id="confirm" class="hidden">
       <div class="confirm-box">

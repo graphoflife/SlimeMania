@@ -19,7 +19,7 @@ the slime hits and pops make sound.
 ## How to play
 
 - **Move**: touch where the gun should go (and drag), move the mouse, or use the arrow keys / A and D.
-- **Menu bar**: below the chain belt: money, level selector, shop, sound. On phones the game goes
+- **Menu bar**: below the chain belt: money, level selector and the shop (cart) button. On phones the game goes
   fullscreen when you start (on iPhone use "Add to Home Screen" instead).
 - **Armory**: buy weapons and upgrade them. Tap a weapon to equip it (up to 3; equipping a fourth
   replaces the one equipped longest ago). Tap the square ▲ button for one level, or hold it for
@@ -27,11 +27,13 @@ the slime hits and pops make sound.
 - **Levels**: clear the first wave of a level to unlock the next one. You can keep farming any
   unlocked level for as long as you like. If a slime reaches the bottom, the level restarts.
 - **Night**: between 20:00 and 06:00 (device clock) the sky turns to night with stars and a moon.
-  The SKY switch at the bottom of the Armory chooses AUTO, DAY or NIGHT.
+  It can also be set by hand in the settings.
 - `E` / `Tab` opens the Armory on desktop, `Esc` closes it.
 
-Progress is saved in the browser (localStorage). The RESET GAME button at the bottom of the Armory
-wipes it and starts over (after a confirmation).
+- **Settings** (gear button at the bottom of the Armory): sound on/off, sky AUTO/DAY/NIGHT and
+  RESET GAME (after a confirmation).
+
+Progress is saved in the browser (localStorage).
 
 ## The numbers
 
