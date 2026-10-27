@@ -263,14 +263,14 @@ export const WEAPONS = [
   },
   {
     id: 'nova', name: 'Supernova', desc: 'A star that explodes into stars that explode.',
-    interval: U(1.0, 0.2), count: 1, pulse: U(0),
-    speed: U(900), angle: U(0, 4),
+    interval: U(0.5, 0.1), count: 1, pulse: U(0),
+    speed: U(600), angle: U(0, 4),
     stages: [
-      { sprite: 'star_big', orient: 'spin', spin: [4, 6], tints: TINTS.stars, trail: 'star', trailLen: 70, share: 0.2, hits: 8, rest: 0.022, recoil: 3.3, rotKick: 14,
-        split: { count: 8, mode: 'burst', angle: 75, speed: [855, 1035], tint: 'random', fx: 'nova' } },
-      { sprite: 'star', orient: 'spin', spin: [6, 10], tints: TINTS.stars, trail: 'star', trailLen: 38, aim: true, share: 0.4, hits: 4, rest: 0.022, recoil: 2, rotKick: 10,
-        split: { count: 5, mode: 'burst', angle: 60, speed: [855, 1035], fx: 'boom_s' } },
-      { sprite: 'spark_w', orient: 'none', aim: true, share: 0.4, hits: 4, rest: 0.018, recoil: 1.3, rotKick: 8 },
+      { sprite: 'star_big', orient: 'spin', spin: [4, 6], tints: TINTS.stars, trail: 'star', trailLen: 140, share: 0.2, hits: 8, rest: 0.033, recoil: 3.3, rotKick: 14,
+        split: { count: 8, mode: 'burst', angle: 75, speed: [570, 690], tint: 'random', fx: 'nova' } },
+      { sprite: 'star', orient: 'spin', spin: [6, 10], tints: TINTS.stars, trail: 'star', trailLen: 76, aim: true, share: 0.4, hits: 4, rest: 0.033, recoil: 2, rotKick: 10,
+        split: { count: 5, mode: 'burst', angle: 60, speed: [570, 690], fx: 'boom_s' } },
+      { sprite: 'spark_w', orient: 'none', aim: true, share: 0.4, hits: 4, rest: 0.027, recoil: 1.3, rotKick: 8 },
     ],
   },
 ];
