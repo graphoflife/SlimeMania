@@ -8,6 +8,7 @@
 //   angle     launch angle in degrees, 0 = straight up (range). fan: spread evenly.
 //             sweep: a fan that goes left to right, then back right to left, without a break
 //             (the pulse fills the interval). tintByFan: colour each shot by its fan position.
+//             fanOrder: the fan position (from the left) of each shot of a pulse, in firing order.
 //             beam: the shots of a pulse share one angle and get evenly stepped speeds.
 //   (trailFrac: tail length as a fraction of the distance flown, instead of trailLen)
 //
@@ -66,7 +67,7 @@ export const WEAPONS = [
   },
   {
     id: 'shuriken', name: 'Ninja Stars',
-    interval: U(0.55, 0.1), count: 4, pulse: U(0.18, 0.03), fan: true,
+    interval: U(0.55, 0.1), count: 4, pulse: U(0.18, 0.03), fan: true, fanOrder: [0, 2, 1, 3],
     speed: U(645, 30), angle: U(0, 10),
     stages: [{ sprite: 'shuriken', orient: 'spin', spin: [16, 24], hits: 5, rest: 0.033, recoil: 1.7, rotKick: 15 }],
   },
@@ -309,7 +310,7 @@ export function buildStats(def, level, nominalDps) {
   return {
     id: def.id, def, level, dps, interval, pulse, stages,
     count: def.count, speed: def.speed, angle: def.angle, fan: def.fan, sweep: def.sweep, tintByFan: def.tintByFan,
-    beam: def.beam,
+    beam: def.beam, fanOrder: def.fanOrder,
   };
 }
 

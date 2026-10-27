@@ -223,7 +223,7 @@ export class World {
     let a, tint = null;
     if ((st.fan || st.sweep) && n > 1) {
       // fan position from the left; a sweep runs back from the right every other pulse
-      const pos = st.sweep && em.back ? n - 1 - i : i;
+      const pos = st.sweep && em.back ? n - 1 - i : st.fanOrder ? st.fanOrder[i] : i;
       a = st.angle.mean + st.angle.spread * ((2 * pos) / (n - 1) - 1) + (st.sweep ? 0 : rng.range(-1.5, 1.5));
       if (st.tintByFan) tint = st.stages[0].tints[pos % st.stages[0].tints.length];
     } else if (st.beam) {
