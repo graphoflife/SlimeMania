@@ -386,7 +386,6 @@ button {
 .info { min-width: 0; }
 .wname { font-weight: 700; line-height: 1.15; }
 .wname .lv { color: var(--hi); margin-left: calc(var(--u) * 2); }
-.wdesc { color: #fff9; margin-top: calc(var(--u) * 2); line-height: 1.2; }
 .wstat { color: var(--lime); margin-top: calc(var(--u) * 2); }
 .wstat .rate { color: var(--cyan); }
 .btns { display: flex; flex-direction: column; gap: calc(var(--u) * 3); align-items: stretch; }

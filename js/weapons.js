@@ -46,43 +46,43 @@ export const TINTS = {
 
 export const WEAPONS = [
   {
-    id: 'mg', name: 'Machine Gun', desc: 'A steady stream of hot lead.',
+    id: 'mg', name: 'Machine Gun',
     interval: U(0.08, 0.008), count: 1, pulse: U(0),
     speed: U(780, 45), angle: U(0, 2.5),
     stages: [{ sprite: 'bullet', recoil: 1.7, rotKick: 6 }],
   },
   {
-    id: 'shotgun', name: 'Shotgun', desc: 'One pump, eight pellets.',
+    id: 'shotgun', name: 'Shotgun',
     interval: U(0.9, 0.08), count: 8, pulse: U(0),
     speed: U(720, 90), angle: U(0, 15),
     stages: [{ sprite: 'pellet', orient: 'none', recoil: 2.7, rotKick: 12 }],
   },
   {
-    id: 'water', name: 'Water Droplets', desc: 'A splashy burst of ten drops.',
+    id: 'water', name: 'Water Droplets',
     interval: U(0.4, 0.04), count: 10, pulse: U(0.2, 0.02),
     speed: U(660, 75), angle: N(0, 4),
     stages: [{ sprite: 'drop', recoil: 0.7, rotKick: 4 }],
   },
   {
-    id: 'shuriken', name: 'Ninja Stars', desc: 'Spinning stars that slice five times.',
+    id: 'shuriken', name: 'Ninja Stars',
     interval: U(0.55, 0.1), count: 4, pulse: U(0.18, 0.03), fan: true,
     speed: U(645, 30), angle: U(0, 10),
     stages: [{ sprite: 'shuriken', orient: 'spin', spin: [16, 24], hits: 5, rest: 0.033, recoil: 1.7, rotKick: 15 }],
   },
   {
-    id: 'arrows', name: 'Arrows', desc: 'Fast, piercing and punchy.',
+    id: 'arrows', name: 'Arrows',
     interval: U(0.5, 0.1), count: 3, pulse: U(0.15, 0.03),
     speed: U(930, 60), angle: U(0, 2),
     stages: [{ sprite: 'arrow', trail: 'wind', trailLen: 22, hits: 3, rest: 0.04, recoil: 4, rotKick: 10 }],
   },
   {
-    id: 'leaves', name: 'Plant Leaves', desc: 'A swirling gust of razor leaves.',
+    id: 'leaves', name: 'Plant Leaves',
     interval: N(0.45, 0.12), count: 6, pulse: U(0.3, 0.05),
     speed: U(600, 75), angle: U(0, 25),
     stages: [{ sprite: 'leaf', orient: 'spin', spin: [6, 12], hits: 2, rest: 0.04, recoil: 1, rotKick: 20 }],
   },
   {
-    id: 'laser', name: 'Laser', desc: 'One long, solid beam that pierces everything.',
+    id: 'laser', name: 'Laser',
     // 8 segments leave together, each a step faster than the one behind: they stretch out
     // along one line, and their tails fill the gaps, so it looks like one long beam
     interval: U(0.45, 0.05), count: 8, pulse: U(0), beam: true,
@@ -90,7 +90,7 @@ export const WEAPONS = [
     stages: [{ sprite: 'laser', trail: 'laser', trailFrac: 0.17, hits: 15, rest: 0.017, recoil: 1, rotKick: 5 }],
   },
   {
-    id: 'bomb', name: 'Small Bomb', desc: 'A bomb that bursts into shrapnel.',
+    id: 'bomb', name: 'Small Bomb',
     interval: U(0.8, 0.15), count: 2, pulse: U(0.2, 0.04),
     speed: U(600, 30), angle: U(0, 6),
     stages: [
@@ -100,29 +100,19 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'banana', name: 'Banana', desc: 'Slippery. Makes slimes spin.',
+    id: 'banana', name: 'Banana',
     interval: U(0.7, 0.2), count: 2, pulse: U(0.25, 0.05),
     speed: U(630, 60), angle: U(0, 12),
     stages: [{ sprite: 'banana', orient: 'spin', spin: [10, 15], hits: 5, rest: 0.027, recoil: 1.3, rotKick: 45 }],
   },
   {
-    id: 'daggers', name: 'Daggers', desc: 'A never-ending fan of blades, sweeping back and forth.',
+    id: 'daggers', name: 'Daggers',
     interval: U(0.55), count: 5, pulse: U(0), sweep: true,
     speed: U(840, 30), angle: U(0, 16),
     stages: [{ sprite: 'dagger', recoil: 2.7, rotKick: 10 }],
   },
   {
-    id: 'snow', name: 'Snowflakes', desc: 'Flakes that shatter into more flakes.',
-    interval: U(0.7, 0.15), count: 3, pulse: U(0.3, 0.05),
-    speed: U(600, 45), angle: U(0, 12),
-    stages: [
-      { sprite: 'flake', orient: 'spin', spin: [2, 4], share: 0.4, hits: 3, rest: 0.04, recoil: 0.7, rotKick: 6,
-        split: { count: 3, mode: 'burst', angle: 40, speed: [570, 675] } },
-      { sprite: 'flake_s', orient: 'spin', spin: [3, 5], share: 0.6, hits: 2, rest: 0.04, recoil: 0.7, rotKick: 6 },
-    ],
-  },
-  {
-    id: 'popcorn', name: 'Popcorn', desc: 'Hot kernels that pop on impact.',
+    id: 'popcorn', name: 'Popcorn',
     interval: U(0.6, 0.15), count: 4, pulse: U(0.25, 0.05),
     speed: U(630, 60), angle: U(0, 10),
     stages: [
@@ -132,7 +122,7 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'lightning', name: 'Lightning', desc: 'Forking bolts of pure zap.',
+    id: 'lightning', name: 'Lightning',
     interval: N(0.5, 0.12), count: 1, pulse: U(0),
     speed: U(1350), angle: U(0, 8),
     stages: [
@@ -144,19 +134,19 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'flames', name: 'Flames', desc: 'A roaring, endless stream of fire.',
+    id: 'flames', name: 'Flames',
     interval: U(0.12, 0.03), count: 5, pulse: U(0.1, 0.02),
     speed: U(630, 90), angle: N(0, 7),
     stages: [{ sprite: ['flame0', 'flame1', 'flame2', 'flame3'], anim: 'age', orient: 'none', hits: 3, rest: 0.033, recoil: 0.3, rotKick: 3 }],
   },
   {
-    id: 'nails', name: 'Nail Gun', desc: 'Tack tack tack tack tack.',
+    id: 'nails', name: 'Nail Gun',
     interval: U(0.12, 0.04), count: 1, pulse: U(0),
     speed: U(1050, 45), angle: U(0, 4),
     stages: [{ sprite: 'nail', recoil: 1.3, rotKick: 5 }],
   },
   {
-    id: 'grenade', name: 'Grenade', desc: 'Explodes into grenades that explode.',
+    id: 'grenade', name: 'Grenade',
     interval: U(1.0, 0.15), count: 2, pulse: U(0.3, 0.05),
     speed: U(600, 30), angle: U(0, 6),
     stages: [
@@ -168,7 +158,7 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'plasma', name: 'Plasma', desc: 'Orbs that chew five times, then divide: 2, 4, 8.',
+    id: 'plasma', name: 'Plasma',
     interval: U(0.9, 0.2), count: 2, pulse: U(0.3, 0.05),
     speed: U(570, 30), angle: U(0, 6),
     stages: [
@@ -180,7 +170,7 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'bubbles', name: 'Bubbles', desc: 'Clouds of little bubbles that pop into tinier ones.',
+    id: 'bubbles', name: 'Bubbles',
     interval: N(0.3, 0.06), count: 8, pulse: U(0.25, 0.04),
     speed: U(585, 60), angle: U(0, 20),
     stages: [
@@ -190,7 +180,7 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'saw', name: 'Saw Blades', desc: 'Blades that grind, then shatter into smaller blades.',
+    id: 'saw', name: 'Saw Blades',
     interval: U(1.0, 0.2), count: 2, pulse: U(0.4, 0.05),
     speed: U(570, 30), angle: U(0, 10),
     stages: [
@@ -202,7 +192,7 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'bigbomb', name: 'Bigger Bomb', desc: 'Like the small one. But bigger.',
+    id: 'bigbomb', name: 'Bigger Bomb',
     interval: U(1.2, 0.2), count: 1, pulse: U(0),
     speed: U(570), angle: U(0, 4),
     stages: [
@@ -214,13 +204,13 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'ice', name: 'Ice Shards', desc: 'Frozen spikes that pierce three deep.',
+    id: 'ice', name: 'Ice Shards',
     interval: U(0.45, 0.1), count: 4, pulse: U(0.1, 0.02), fan: true,
     speed: U(900, 60), angle: U(0, 8),
     stages: [{ sprite: 'icicle', hits: 3, rest: 0.027, recoil: 2, rotKick: 8 }],
   },
   {
-    id: 'fireworks', name: 'Fireworks', desc: 'Rockets that burst into fireworks.',
+    id: 'fireworks', name: 'Fireworks',
     interval: U(0.8, 0.2), count: 2, pulse: U(0.35, 0.05),
     speed: U(630, 45), angle: U(0, 10),
     stages: [
@@ -232,19 +222,19 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'notes', name: 'Music Notes', desc: 'Notes flying on their own sheet music.',
+    id: 'notes', name: 'Music Notes',
     interval: U(0.4, 0.1), count: 3, pulse: U(0.3, 0.05),
     speed: U(630, 45), angle: U(0, 15),
     stages: [{ sprite: 'note', orient: 'none', tints: TINTS.party, trail: 'staff', trailLen: 30, hits: 2, rest: 0.04, recoil: 1.7, rotKick: 25 }],
   },
   {
-    id: 'ducks', name: 'Rubber Ducks', desc: 'Squeaky, bouncy, surprisingly heavy.',
+    id: 'ducks', name: 'Rubber Ducks',
     interval: U(0.8, 0.2), count: 2, pulse: U(0.3, 0.05),
     speed: U(630, 60), angle: U(0, 12),
     stages: [{ sprite: 'duck', orient: 'spin', spin: [5, 8], hits: 4, rest: 0.033, recoil: 7.3, rotKick: 35 }],
   },
   {
-    id: 'meteor', name: 'Meteor', desc: 'A burning rock that explodes, and explodes, and explodes.',
+    id: 'meteor', name: 'Meteor',
     interval: U(1.0, 0.2), count: 1, pulse: U(0),
     speed: U(570, 15), angle: U(0, 6),
     stages: [
@@ -256,13 +246,13 @@ export const WEAPONS = [
     ],
   },
   {
-    id: 'rainbow', name: 'Rainbow', desc: 'A super fast fan, back and forth: together the shots paint a rainbow.',
+    id: 'rainbow', name: 'Rainbow',
     interval: U(0.2), count: 6, pulse: U(0), sweep: true, tintByFan: true,
     speed: U(840), angle: U(0, 12),
     stages: [{ sprite: 'rainbow', tints: TINTS.pastel, trail: 'tint', trailLen: 42, hits: 3, rest: 0.03, recoil: 1.3, rotKick: 8 }],
   },
   {
-    id: 'nova', name: 'Supernova', desc: 'A star that explodes into stars that explode.',
+    id: 'nova', name: 'Supernova',
     interval: U(0.5, 0.1), count: 1, pulse: U(0),
     speed: U(600), angle: U(0, 4),
     stages: [

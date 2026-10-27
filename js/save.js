@@ -4,15 +4,20 @@ import { weaponStart, effDps, slimeHp, levelCost } from './economy.js';
 
 const KEY = 'slimemania.save.v1';
 
-// Weapon order of save versions 1 and 2 (30 weapons); later saves are migrated by id.
+// On disk, weapons are stored by id ({ id: level }), so removing or reordering weapons never
+// mixes up progress. In memory the game uses arrays indexed like WEAPONS.
+// Older saves stored arrays in the weapon order of their time:
 const V2_IDS = ['mg', 'shotgun', 'water', 'shuriken', 'arrows', 'leaves', 'laser', 'bomb', 'banana',
   'daggers', 'snow', 'popcorn', 'lightning', 'flames', 'nails', 'grenade', 'plasma', 'bubbles', 'cannon',
   'saw', 'dollar', 'bigbomb', 'ice', 'fireworks', 'splitter', 'notes', 'ducks', 'meteor', 'prism', 'nova'];
+const V3_IDS = ['mg', 'shotgun', 'water', 'shuriken', 'arrows', 'leaves', 'laser', 'bomb', 'banana',
+  'daggers', 'snow', 'popcorn', 'lightning', 'flames', 'nails', 'grenade', 'plasma', 'bubbles', 'saw',
+  'bigbomb', 'ice', 'fireworks', 'notes', 'ducks', 'meteor', 'rainbow', 'nova'];
 const RENAMED = { prism: 'rainbow', splitter: 'grenade' };
 
 export function freshSave() {
   return {
-    v: 3,
+    v: 4,
     money: 0,
     level: 1,       // level being played
     maxLevel: 1,    // highest unlocked level
@@ -31,21 +36,25 @@ export function loadSave() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return s;
     const d = JSON.parse(raw);
-    if (!d || ![1, 2, 3].includes(d.v)) return s;
-    if (d.v < 3) {
-      // weapons were removed and merged: carry levels and equipment over by weapon id
-      const idx = (id) => WEAPONS.findIndex((w) => w.id === (RENAMED[id] || id));
-      const levels = WEAPONS.map(() => 0);
-      d.levels.forEach((l, k) => { const i = idx(V2_IDS[k]); if (i >= 0) levels[i] = Math.max(levels[i], l); });
-      if (levels[0] < 1) levels[0] = 1;
-      d.levels = levels;
-      d.equipped = [...new Set(d.equipped.map((k) => idx(V2_IDS[k])).filter((i) => i >= 0))];
-      d.v = 3;
+    if (!d || ![1, 2, 3, 4].includes(d.v)) return s;
+    let byId, equippedIds;
+    if (d.v === 4) {
+      byId = d.weapons || {};
+      equippedIds = d.equippedIds || [];
+    } else {
+      const ids = d.v === 3 ? V3_IDS : V2_IDS;
+      byId = {};
+      d.levels.forEach((l, k) => {
+        const id = RENAMED[ids[k]] || ids[k];
+        if (id && l > 0) byId[id] = Math.max(byId[id] || 0, l);
+      });
+      equippedIds = d.equipped.map((k) => RENAMED[ids[k]] || ids[k]);
     }
-    Object.assign(s, d);
-    // tolerate added weapons in later versions
-    while (s.levels.length < WEAPONS.length) s.levels.push(0);
-    s.equipped = s.equipped.filter((i) => s.levels[i] > 0).slice(0, 3);
+    for (const key of ['money', 'level', 'maxLevel', 'muted', 'hinted', 'sky', 'kills']) if (key in d) s[key] = d[key];
+    s.levels = WEAPONS.map((w) => byId[w.id] || 0);
+    if (s.levels[0] < 1) s.levels[0] = 1;
+    s.equipped = [...new Set(equippedIds.map((id) => WEAPONS.findIndex((w) => w.id === id)))]
+      .filter((i) => i >= 0 && s.levels[i] > 0).slice(0, 3);
     if (!s.equipped.length) s.equipped = [0];
     if (!isFinite(s.money) || s.money < 0) s.money = 0;
   } catch { /* corrupted or blocked storage: start fresh */ }
@@ -74,7 +83,14 @@ export function testAllSave() {
 }
 
 export function writeSave(s) {
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* storage unavailable */ }
+  const { levels, equipped, ...rest } = s;
+  const out = {
+    ...rest,
+    v: 4,
+    weapons: Object.fromEntries(WEAPONS.map((w, i) => [w.id, levels[i]]).filter(([, l]) => l > 0)),
+    equippedIds: equipped.map((i) => WEAPONS[i].id),
+  };
+  try { localStorage.setItem(KEY, JSON.stringify(out)); } catch { /* storage unavailable */ }
 }
 
 export function clearSave() {

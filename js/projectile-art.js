@@ -228,25 +228,6 @@ const DEFS = {
     .shape(box(4.5, 15.6, 1.2, 2.2), WOOD)
     .shape(circle(4.5, 18, 1.2), GOLD),
 
-  flake: () => {
-    const arms = [];
-    for (let k = 0; k < 6; k++) {
-      const a = (k * TAU) / 6 - Math.PI / 2, ex = 7.5 + Math.cos(a) * 6.4, ey = 7.5 + Math.sin(a) * 6.4;
-      arms.push(seg(7.5, 7.5, ex, ey, 0.8));
-      const bx = 7.5 + Math.cos(a) * 4, by = 7.5 + Math.sin(a) * 4;
-      for (const s of [-1, 1]) arms.push(seg(bx, by, bx + Math.cos(a + s * 0.9) * 2.4, by + Math.sin(a + s * 0.9) * 2.4, 0.6));
-    }
-    return A(15, 15).shape(union(...arms, circle(7.5, 7.5, 1.8)), ICE).dot(7, 7, '#ffffff');
-  },
-  flake_s: () => {
-    const arms = [];
-    for (let k = 0; k < 6; k++) {
-      const a = (k * TAU) / 6 - Math.PI / 2;
-      arms.push(seg(4.5, 4.5, 4.5 + Math.cos(a) * 3.6, 4.5 + Math.sin(a) * 3.6, 0.7));
-    }
-    return A(9, 9).shape(union(...arms, circle(4.5, 4.5, 1.2)), ICE);
-  },
-
   kernel: () => A(7, 8)
     .shape(ellipse(3.5, 4, 2.4, 3), P('#ffd98a', '#fff3c8', '#d9a24a', '#6a4010'))
     .shape(both(ellipse(3.5, 4, 2.4, 3), box(3.5, 6.6, 3, 1)), flat('#b07a2a')),

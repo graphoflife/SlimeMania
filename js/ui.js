@@ -172,7 +172,6 @@ export class UI {
         <div class="icon-box"></div>
         <div class="info">
           <div class="wname"><span class="nm"></span><span class="eq">ON</span></div>
-          <div class="wdesc"></div>
           <div class="wstat"></div>
         </div>
         <div class="btns">
@@ -184,7 +183,6 @@ export class UI {
         icon: el.querySelector('.icon-box'),
         nm: el.querySelector('.nm'),
         uplv: el.querySelector('.uplv'),
-        desc: el.querySelector('.wdesc'),
         stat: el.querySelector('.wstat'),
         up: el.querySelector('.upsq:not(.buysq)'),
         cost: el.querySelector('.cost'),
@@ -288,7 +286,6 @@ export class UI {
     const eq = s.equipped.includes(c.i);
     c.el.className = 'card' + (owned ? ' owned' : '') + (eq ? ' equipped' : '') + (isNext ? ' next' : '') + (!owned && !isNext ? ' locked' : '');
     c.nm.textContent = owned || isNext ? c.def.name : '???';
-    c.desc.textContent = owned || isNext ? c.def.desc : 'Unlock the weapon above first.';
     if (owned) {
       const rate = Math.min(lvl - 1, ECON.RATE_LEVELS);
       c.stat.innerHTML = `DPS ${fmt(shownDps(c.def, lvl))}` +
