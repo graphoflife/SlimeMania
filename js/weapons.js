@@ -250,7 +250,7 @@ export const WEAPONS = [
   {
     id: 'rainbow', name: 'Rainbow',
     interval: U(0.2), count: 6, pulse: U(0), sweep: true, tintByFan: true,
-    speed: U(840), angle: U(0, 12),
+    speed: U(840), angle: U(0, 8),
     stages: [{ sprite: 'rainbow', tints: TINTS.pastel, trail: 'tint', trailLen: 84, hits: 3, rest: [0.02, 0.15], recoil: 1.3, rotKick: 8 }],
   },
   {
