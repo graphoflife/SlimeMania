@@ -11,6 +11,7 @@ import { initAudio, sfx, setMuted, suspendAudio, resumeAudio } from './audio.js'
 import { botUpdate } from './bot.js';
 import { fmt } from './format.js';
 import { warmJobs, warmSlimes, warmProjectiles } from './sprites.js';
+import { keepScreenOn } from './wakelock.js';
 
 const STEP = 1 / 60;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -64,6 +65,7 @@ class Game {
       if (document.hidden) { writeSave(this.state); suspendAudio(); } else resumeAudio();
     });
     addEventListener('pagehide', () => writeSave(this.state));
+    keepScreenOn();
     requestAnimationFrame((t) => this.loop(t));
   }
 
