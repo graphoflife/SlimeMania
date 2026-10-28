@@ -262,20 +262,17 @@ export class World {
   // aiming where that slime will be when the shot gets there.
   aimAtClosest(p) {
     const v = Math.hypot(p.vx, p.vy);
-    let best = null, bd = Infinity;
+    let target = null, bd = Infinity;
     for (const list of [this.slimes, this.pending]) {
       for (const o of list) {
         if (o.dead || o.id === p.ignore) continue;
         const d = Math.hypot(o.x - p.x, o.y - p.y);
-        const t = d / v;
-        const tx = o.x + (o.vx + o.kx) * t, ty = o.y + (o.vy + o.ky) * t;
-        const a = Math.atan2(ty - p.y, tx - p.x);
-        if (d >= bd) continue;
-        bd = d;
-        best = a;
+        if (d < bd) { bd = d; target = o; }
       }
     }
-    if (best === null) return;
+    if (target === null) return;
+    const o = target, t = bd / v;
+    const best = Math.atan2(o.y + (o.vy + o.ky) * t - p.y, o.x + (o.vx + o.kx) * t - p.x);
     p.vx = Math.cos(best) * v;
     p.vy = Math.sin(best) * v;
     if (p.s.orient !== 'spin') p.ang = best;
