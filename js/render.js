@@ -57,11 +57,20 @@ export function randomSlimeColors(rng = Math.random) {
   return [pool.slice(0, 3), pool.slice(3, 6)];
 }
 
+// Beside the playfield the landscape is a little darker, with a stepped shadow along the
+// edges: [distance from the edge, darkness] (the steps add up).
+const SIDE_DIM = 0.3;
+const SIDE_EDGE = [[1, 0.35], [3, 0.16], [6, 0.1], [10, 0.06]];
+const SHADE = '#140f24';
+
 export class Renderer {
-  constructor(canvas) {
+  constructor(canvas, backdrop) {
     this.canvas = canvas;
     this.g = canvas.getContext('2d');
     this.g.imageSmoothingEnabled = false;
+    this.backdrop = backdrop; // wide screens: the landscape beside the playfield
+    this.bd = backdrop?.getContext('2d');
+    this.side = 0;            // columns of landscape on each side
     this.bg = new Background();
     this.colors = randomSlimeColors();
     this.hits = [];
@@ -84,6 +93,19 @@ export class Renderer {
     this.extra = extra;
     this.canvas.height = H + extra + BOTTOM_BAR;
     this.g.imageSmoothingEnabled = false;
+  }
+
+  // columns of landscape beside the playfield on screens wider than it
+  setSide(side) {
+    if (!this.backdrop) return;
+    this.side = side;
+    this.bg.wide = side > 0;
+    this.backdrop.style.display = side > 0 ? '' : 'none';
+    if (side > 0) {
+      this.backdrop.width = W + 2 * side;
+      this.backdrop.height = H + this.extra + BOTTOM_BAR;
+      this.bd.imageSmoothingEnabled = false;
+    }
   }
 
   reset() {
@@ -232,10 +254,37 @@ export class Renderer {
     }
     if (opts.dim) {
       g.globalAlpha = opts.dim;
-      g.fillStyle = '#140f24';
+      g.fillStyle = SHADE;
       g.fillRect(0, 0, W, height);
       g.globalAlpha = 1;
     }
+    if (this.side > 0) this.drawBackdrop(opts.dim || 0);
+  }
+
+  // The landscape beside the playfield, in step with the one behind it (the game canvas covers
+  // the middle, so only the two side strips are drawn).
+  drawBackdrop(dim) {
+    const g = this.bd, s = this.side, ex = this.extra, height = H + ex + BOTTOM_BAR;
+    if (this.backdrop.height !== height) this.setSide(s);
+    g.setTransform(1, 0, 0, 1, s, 0); // x = 0 is the left edge of the playfield
+    g.clearRect(-s, 0, W + 2 * s, height);
+    g.save();
+    g.beginPath();
+    g.rect(-s, 0, s, height);
+    g.rect(W, 0, s, height);
+    g.clip();
+    g.globalCompositeOperation = 'destination-over';
+    this.bg.draw(g, ex, this.night, -s, W + s);
+    g.globalCompositeOperation = 'source-over';
+    g.fillStyle = SHADE;
+    g.globalAlpha = 1 - (1 - SIDE_DIM) * (1 - dim);
+    g.fillRect(-s, 0, W + 2 * s, height);
+    for (const [d, a] of SIDE_EDGE) {
+      g.globalAlpha = a;
+      g.fillRect(-d, 0, d, height);
+      g.fillRect(W, 0, d, height);
+    }
+    g.restore();
   }
 
   drawSlimes(world) {

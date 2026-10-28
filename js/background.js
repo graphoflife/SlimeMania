@@ -1,11 +1,14 @@
 // Faded pixel landscape: banded sky, drifting clouds and three parallax layers
 // (snowy mountains, hills, grass) scrolling from left to right. Always the same (seeded).
 // At night the same landscape is moonlit, with stars and a moon; day and night cross-fade.
-import { W, H, MAX_EXTRA } from './config.js';
+// Everything repeats sideways, so on wide screens the landscape continues beside the playfield.
+import { W, H, MAX_EXTRA, BOTTOM_BAR } from './config.js';
 import { RNG } from './rng.js';
 import { makeCanvas, mix } from './sprites.js';
 
 const TILE = W * 2; // layers repeat every 432 px
+const STAR_P = W * 3; // the starry sky repeats every 648 px
+const COL_STARS = 150; // stars above the playfield; the others are beside it
 
 // Periodic value noise in [0,1] over one tile.
 function pnoise(n, rng) {
@@ -94,12 +97,12 @@ function buildMoon() {
   return c;
 }
 
-function buildStars(rng) {
+function buildStars(rng, n, x0, x1) {
   const cols = ['#ffffff', '#fff3cf', '#d6e6ff'];
-  return Array.from({ length: 150 }, () => {
+  return Array.from({ length: n }, () => {
     const r = rng.next();
     return {
-      x: Math.floor(rng.range(0, W)), y: Math.floor(rng.range(-MAX_EXTRA, 255)),
+      x: Math.floor(rng.range(x0, x1)), y: Math.floor(rng.range(-MAX_EXTRA, 255)),
       big: r < 0.1, base: r < 0.4 ? 1 : rng.range(0.55, 0.9),
       color: rng.pick(cols), speed: rng.range(0.8, 3), ph: rng.range(0, 6.3),
     };
@@ -226,7 +229,7 @@ function buildHills(rng) {
 }
 
 function buildGrass(rng) {
-  const top0 = 316, hgt = 40;
+  const top0 = 316, hgt = H + BOTTOM_BAR - top0; // down to the bottom edge, for beside the playfield
   const c = makeCanvas(TILE, hgt);
   const g = c.getContext('2d');
   const n1 = pnoise(6, rng), n2 = pnoise(54, rng);
@@ -254,10 +257,9 @@ function buildGrass(rng) {
   return { c, y: top0 };
 }
 
-// two copies of a layer side by side, only the ones on screen
-function tiles(g, img, x, y) {
-  if (x + TILE > 0) g.drawImage(img, x, y);
-  if (x + TILE < W) g.drawImage(img, x + TILE, y);
+// copies of a picture every p pixels, only the ones between x0 and x1
+function tiles(g, img, x, y, p, x0, x1) {
+  for (let t = x + Math.floor((x0 - x) / p) * p; t < x1; t += p) if (t + img.width > x0) g.drawImage(img, t, y);
 }
 
 export class Background {
@@ -265,9 +267,10 @@ export class Background {
     const rng = new RNG(4242);
     this.sky = buildSky(new RNG(77), DAY_SKY); // own seeds: the other layers stay as they were
     this.nightSky = buildSky(new RNG(77), NIGHT_SKY);
-    this.stars = buildStars(new RNG(99));
-    this.starSky = makeCanvas(W, H + MAX_EXTRA); // night sky with the stars on it
+    this.stars = [...buildStars(new RNG(99), COL_STARS, 0, W), ...buildStars(new RNG(98), 300, W, STAR_P)];
+    this.starSky = makeCanvas(STAR_P, H + MAX_EXTRA); // night sky with the stars on it
     this.starT = -1;
+    this.wide = false; // true when the landscape is also drawn beside the playfield
     this.moon = buildMoon();
     this.t = 0;
     this.layers = [
@@ -296,44 +299,49 @@ export class Background {
   }
 
   // oy: rows of extra sky above the playfield. night: 0 = day, 1 = night (cross-fades)
+  // x0, x1: the columns to cover (the playfield is 0 to W).
   // Drawn from the front to the back: the caller uses 'destination-over', so every piece goes
   // behind what is already on the canvas (the game scene is drawn first).
-  draw(g, oy = 0, night = 0) {
+  draw(g, oy = 0, night = 0, x0 = 0, x1 = W) {
     const day = night < 1; // in full night the night pictures cover the day ones completely
     for (let i = this.layers.length - 1; i >= 0; i--) {
       const l = this.layers[i];
       const x = Math.round(l.off) - TILE;
       if (night > 0) {
         g.globalAlpha = night;
-        tiles(g, l.night, x, l.y + oy);
+        tiles(g, l.night, x, l.y + oy, TILE, x0, x1);
         g.globalAlpha = 1;
       }
-      if (day) tiles(g, l.c, x, l.y + oy);
+      if (day) tiles(g, l.c, x, l.y + oy, TILE, x0, x1);
     }
     for (let i = this.clouds.length - 1; i >= 0; i--) {
       const c = this.clouds[i];
-      const x = Math.round(c.x), y = Math.round(c.y) + oy;
-      if (night > 0) { g.globalAlpha = 0.7 * night; g.drawImage(c.night, x, y); }
+      // a cloud leaving on the right comes back on the left: beside the playfield that is a copy
+      const x = Math.round(c.x), y = Math.round(c.y) + oy, p = W + c.c.width + 8;
+      if (night > 0) { g.globalAlpha = 0.7 * night; tiles(g, c.night, x, y, p, x0, x1); }
       g.globalAlpha = 0.85;
-      g.drawImage(c.c, x, y);
+      tiles(g, c.c, x, y, p, x0, x1);
     }
     g.globalAlpha = 1;
     if (night > 0) {
       g.globalAlpha = night;
       g.drawImage(this.moon, 146, 4); // near the top of the screen
-      g.drawImage(this.starrySky(), 0, oy - MAX_EXTRA);
+      tiles(g, this.starrySky(), 0, oy - MAX_EXTRA, STAR_P, x0, x1);
       g.globalAlpha = 1;
     }
-    if (day) g.drawImage(this.sky, 0, oy - MAX_EXTRA);
+    if (day) tiles(g, this.sky, 0, oy - MAX_EXTRA, W, x0, x1);
   }
 
   // The stars twinkle slowly, so the starry night sky is repainted only 20 times a second.
   starrySky() {
-    if (this.t - this.starT < 0.05 && this.t >= this.starT) return this.starSky;
+    if (this.t - this.starT < 0.05 && this.t >= this.starT && this.starWide === this.wide) return this.starSky;
     this.starT = this.t;
+    this.starWide = this.wide;
     const g = this.starSky.getContext('2d');
-    g.drawImage(this.nightSky, 0, 0);
-    for (const s of this.stars) {
+    const n = this.wide ? this.stars.length : COL_STARS;
+    for (let x = 0; x < (this.wide ? STAR_P : W); x += W) g.drawImage(this.nightSky, x, 0);
+    for (let i = 0; i < n; i++) {
+      const s = this.stars[i];
       g.globalAlpha = s.base * (0.65 + 0.35 * Math.sin(this.t * s.speed + s.ph));
       g.fillStyle = s.color;
       const y = s.y + MAX_EXTRA;

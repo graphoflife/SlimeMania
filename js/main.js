@@ -20,7 +20,7 @@ class Game {
   constructor() {
     this.canvas = document.getElementById('screen');
     this.root = document.getElementById('game');
-    this.renderer = new Renderer(this.canvas);
+    this.renderer = new Renderer(this.canvas, document.getElementById('backdrop'));
     this.world = new World(new RNG());
     const params = new URLSearchParams(location.search);
     if (params.has('testall')) {
@@ -76,8 +76,12 @@ class Game {
     const u = Math.min(vw / 216, vh / base);
     const extra = clamp(Math.floor(vh / u - base), 0, MAX_EXTRA);
     document.documentElement.style.setProperty('--u', u + 'px');
+    // on screens wider than the playfield the landscape continues on both sides
+    const side = Math.max(0, Math.ceil((vw / u - W) / 2 - 0.01));
     document.documentElement.style.setProperty('--gh', base + extra);
+    document.documentElement.style.setProperty('--bw', W + 2 * side);
     this.renderer.setExtra(extra);
+    this.renderer.setSide(side);
     this.world.topY = -extra;
   }
 
