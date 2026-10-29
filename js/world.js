@@ -23,10 +23,11 @@ const SPEED_MUL = [0.87, 0.94, 1.01];  // drift speed per size (~28 s from the t
 const BASE_PATH = LOSE_Y - 2 * SLIME_R[0] - 4;
 const STEER = 1.4;               // how quickly a slime eases into its new drift (1/s)
 const KICK_DAMP = 3;             // how quickly recoil fades (1/s)
-const CORE = 0.5;                // big and medium slimes have a soft core of half their size...
+const CORE = 0.65;               // big and medium slimes have a soft core of 65 % of their size...
 const PUSH = 2;                  // ...and overlapping cores drift apart at this rate (1/s),
 const PUSH_MAX = 40;             // never faster than this (px/s),
 const PUSH_EASE = 7;             // easing into and out of that speed (1/s)
+const MAX_CORE = SLIME_R[0] * CORE;
 const GROW_T = 0.5;              // spawn: grow from nothing
 const CHILD_GROW_T = 0.2;        // children grow from CHILD_G0 to full size
 const CHILD_G0 = 0.55;
@@ -111,7 +112,8 @@ export class World {
     this.emitters = [];
     this.gun = { x: W / 2, vx: 0, targetX: W / 2, kick: [0, 0, 0] };
     this.grid = Array.from({ length: COLS }, () => []);
-    this.cores = [];
+    this.cores = [];    // big and medium slimes, sorted by x
+    this.coreStep = 0;
     this.stamp = 0;
     this.topY = 0; // top edge of the visible sky, set by the game on tall screens
     this.nextId = 1;
@@ -312,6 +314,7 @@ export class World {
       vx: 0, vy: 0,          // steering drift
       kx: 0, ky: 0,          // recoil, fades out
       px: 0, py: 0,          // pushed by overlapping neighbours, eases in and out
+      tpx: 0, tpy: 0, cr: 0, coreStep: 0, // pushApart() bookkeeping
       tvx: 0, tvy: 0,        // drift the slime is easing into
       hp, maxHp: hp,
       heading: DOWN, face: DOWN, faceTarget: DOWN, kick: 0,
@@ -389,26 +392,39 @@ export class World {
     this.pushApart(dt);
   }
 
-  // Big and medium slimes may overlap a bit, but their cores (half their size) do not stay
+  // Big and medium slimes may overlap a bit, but their cores (65 % of their size) do not stay
   // overlapped: they drift apart, the faster the more they overlap. The push speed eases in
   // and out, so nothing ever jerks (not even when a neighbour pops). The bigger slime gives
-  // way less.
+  // way less. Small slimes have no core: they are never pushed.
   pushApart(dt) {
-    const list = this.cores;
-    list.length = 0;
+    const list = this.cores, step = ++this.coreStep;
     for (const s of this.slimes) {
       if (s.dead || s.size > 1) continue;
-      s.cr = s.r * CORE * Math.min(1, slimeScale(s));
+      if (s.coreStep === 0) list.push(s); // new
+      s.coreStep = step;
+      s.cr = s.r * CORE * (s.age >= s.growT ? 1 : Math.min(1, slimeScale(s)));
       s.tpx = 0; s.tpy = 0; // push speed it should have
-      list.push(s);
     }
-    for (let i = 0; i < list.length; i++) {
-      const a = list[i];
-      for (let j = i + 1; j < list.length; j++) {
+    // the list is kept between steps: drop popped slimes (and all of them after a new level),
+    // then sort by x (insertion sort: quick, as the order hardly changes from step to step)
+    let n = 0;
+    for (let i = 0; i < list.length; i++) if (list[i].coreStep === step) list[n++] = list[i];
+    list.length = n;
+    for (let i = 1; i < n; i++) {
+      const s = list[i], x = s.x;
+      let j = i - 1;
+      while (j >= 0 && list[j].x > x) { list[j + 1] = list[j]; j--; }
+      list[j + 1] = s;
+    }
+    // sorted by x, each slime only looks at the next ones until they are out of reach
+    for (let i = 0; i < n; i++) {
+      const a = list[i], ax = a.x, ay = a.y, ar = a.cr, reach = ar + MAX_CORE;
+      for (let j = i + 1; j < n; j++) {
         const b = list[j];
-        const min = a.cr + b.cr;
-        const dx = b.x - a.x, dy = b.y - a.y;
-        if (dx >= min || dx <= -min || dy >= min || dy <= -min) continue;
+        const dx = b.x - ax;
+        if (dx >= reach) break;
+        const min = ar + b.cr, dy = b.y - ay;
+        if (dx >= min || dy >= min || dy <= -min) continue;
         const d2 = dx * dx + dy * dy;
         if (d2 >= min * min) continue;
         const d = Math.sqrt(d2);
@@ -420,10 +436,14 @@ export class World {
       }
     }
     const ease = 1 - Math.exp(-PUSH_EASE * dt);
-    for (const s of list) {
-      const v = Math.hypot(s.tpx, s.tpy), cap = v > PUSH_MAX ? PUSH_MAX / v : 1;
+    for (let i = 0; i < n; i++) {
+      const s = list[i];
+      if (s.tpx === 0 && s.tpy === 0 && s.px === 0 && s.py === 0) continue; // not being pushed
+      const v2 = s.tpx * s.tpx + s.tpy * s.tpy, cap = v2 > PUSH_MAX * PUSH_MAX ? PUSH_MAX / Math.sqrt(v2) : 1;
       s.px += (s.tpx * cap - s.px) * ease;
       s.py += (s.tpy * cap - s.py) * ease;
+      // the last bit of a push that has faded out is dropped, so resting slimes are skipped
+      if (s.tpx === 0 && s.tpy === 0 && s.px * s.px + s.py * s.py < 1e-4) { s.px = 0; s.py = 0; continue; }
       s.x += s.px * dt;
       s.y += s.py * dt;
       if (s.x < minX(s)) { s.x = minX(s); if (s.px < 0) s.px = 0; }
