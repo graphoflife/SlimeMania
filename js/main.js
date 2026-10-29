@@ -83,6 +83,7 @@ class Game {
     this.renderer.setExtra(extra);
     this.renderer.setSide(side);
     this.world.topY = -extra;
+    this.redraw = true; // a resized canvas is blank
   }
 
   toGameX(clientX) {
@@ -209,11 +210,12 @@ class Game {
   handleEvents() {
     const evs = this.world.events;
     const play = this.mode === 'play';
+    let hitSound = false; // hit sounds are at least a step apart anyway: asked for once per step
     for (const e of evs) {
       this.renderer.onEvent(e);
       if (!play) continue;
       switch (e.type) {
-        case 'hit': sfx('hit'); break;
+        case 'hit': if (!hitSound) { hitSound = true; sfx('hit'); } break;
         case 'pop':
           this.state.money += e.value;
           this.state.kills++;
@@ -338,13 +340,13 @@ class Game {
     const dt = Math.min(0.1, (ts - this.last) / 1000 || 0);
     this.last = ts;
     const paused = this.ui.shopOpen || document.hidden;
+    let n = 0; // world steps this frame
     if (!paused) {
       if (this.keys.left !== this.keys.right) {
         const g = this.world.gun;
         g.targetX = clamp(g.x + (this.keys.left ? -60 : 60), GUN_MIN_X, GUN_MAX_X);
       }
       this.acc += dt;
-      let n = 0;
       while (this.acc >= STEP && n < 6) {
         if (this.mode === 'title' || this.autoplay) botUpdate(this.world, this.bot, STEP);
         this.world.update(STEP);
@@ -375,7 +377,12 @@ class Game {
     }
     const vw = innerWidth, vh = innerHeight;
     if (vw !== this.vw || vh !== this.vh) { this.vw = vw; this.vh = vh; this.fit(); }
-    this.renderer.draw(this.world, { dim: this.mode === 'title' ? 0.35 : 0 });
+    // The world moves in steps of 1/60 s: a frame without a step would show the same picture
+    // again (on 90-144 Hz screens that is every other frame or more), so it is not drawn.
+    if (n > 0 || this.redraw) {
+      this.redraw = false;
+      this.renderer.draw(this.world, { dim: this.mode === 'title' ? 0.35 : 0 });
+    }
     this.ui.tick(dt);
     this.hudT += dt;
     if (this.hudT > 0.25 && this.mode === 'play') { this.hudT = 0; this.ui.updateHud(); }

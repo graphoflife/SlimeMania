@@ -7,6 +7,9 @@ import { sprite, makeCanvas } from './sprites.js';
 import { sfx, upgradeBlip } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
+// The running numbers (money, kill streak) are rewritten at most this often: every new text
+// has to be laid out and painted again, which is slow on phones during a big fight.
+const TEXT_DT = 1 / 15;
 
 // Small pixel icons for buttons, drawn as crisp SVG from ascii maps.
 const ICONS = {
@@ -60,6 +63,7 @@ export class UI {
     this.gain = $('gain');
     this.gainSum = 0;
     this.gainIdle = 0;
+    this.textT = TEXT_DT; // time since a running number was last rewritten
 
     for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = pixIcon(ICONS[el.dataset.icon]);
     $('btnShop').addEventListener('click', () => { sfx('click'); game.openShop(); });
@@ -96,8 +100,9 @@ export class UI {
 
   flushGains(dt) {
     this.gainIdle += dt;
-    if (this.gainDirty) {
+    if (this.gainDirty && this.textT >= TEXT_DT) {
       this.gainDirty = false;
+      this.textT = 0;
       const text = '+' + fmt(this.gainSum);
       if (text !== this.gainText) { this.gainText = text; this.gain.textContent = text; }
       // restart the little bump (an animation object: no forced page layout)
@@ -109,6 +114,8 @@ export class UI {
   }
 
   tick(dt) {
+    this.textT += dt;
+    const write = this.textT >= TEXT_DT;
     this.flushGains(dt);
     const s = this.game.state;
     const target = s.money;
@@ -116,8 +123,11 @@ export class UI {
       const d = target - this.shownMoney;
       if (Math.abs(d) <= Math.max(1, Math.abs(target) * 1e-4)) this.shownMoney = target;
       else this.shownMoney += d * Math.min(1, dt * 12);
+    }
+    if (write && this.shownMoney !== this.moneyAt) {
+      this.moneyAt = this.shownMoney;
       const text = fmt(this.shownMoney);
-      if (text !== this.moneyText) { this.moneyText = text; this.moneyEl.textContent = text; }
+      if (text !== this.moneyText) { this.moneyText = text; this.moneyEl.textContent = text; this.textT = 0; }
     }
     const w = this.game.world;
     const wave = `WAVE ${w.waveNum}`;

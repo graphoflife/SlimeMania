@@ -17,6 +17,11 @@ const PARTY = ['#ff3a7c', '#3ad7ff', '#ffe23a', '#7dff3a', '#c04dff', '#ff8c1a',
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const HIT_LIFE = HIT_FRAMES * 0.05;
 const RING_LIFE = 0.22;
+// Fast weapons land a thousand hits a second. A hit right next to a spark that has only just
+// appeared adds nothing to see, so it shows no spark of its own (each spark costs a draw call).
+const MERGE_R = 8;
+const MERGE_T = 0.1;
+const MAX_SPARKS = 160;
 
 // Chain belt geometry. Links sit exactly PITCH px apart on the straight runs.
 const PITCH = 4;
@@ -117,9 +122,14 @@ export class Renderer {
   // ---------------------------------------------------------------- events -> effects
   onEvent(e) {
     if (e.type === 'hit') {
-      if (this.hits.length < 220) {
-        this.hits.push({ x: e.x, y: e.y, t: 0, rot: Math.random() * TAU, sc: 0.8 + Math.random() * 0.4 });
+      const hits = this.hits;
+      if (hits.length >= MAX_SPARKS) return;
+      // the youngest sparks are at the end
+      for (let i = hits.length - 1; i >= 0 && hits[i].t < MERGE_T; i--) {
+        const dx = hits[i].x - e.x, dy = hits[i].y - e.y;
+        if (dx * dx + dy * dy < MERGE_R * MERGE_R) return;
       }
+      hits.push({ x: e.x, y: e.y, t: 0, rot: Math.random() * TAU, sc: 0.8 + Math.random() * 0.4 });
     } else if (e.type === 'pop') {
       this.burst(e.x, e.y, e.r, e.size, e.kind);
       if (e.size === 0) this.shake = Math.max(this.shake, 1.2);
@@ -222,10 +232,7 @@ export class Renderer {
     // danger line when a slime gets close to the bottom
     let lowest = -1e9;
     for (const s of world.slimes) lowest = Math.max(lowest, s.y + s.r);
-    if (lowest > LOSE_Y - 60 && Math.floor(this.time * 6) % 2 === 0) {
-      g.fillStyle = '#ff2a3c';
-      for (let x = 0; x < W; x += 6) g.fillRect(x, LOSE_Y - 2, 3, 2);
-    }
+    if (lowest > LOSE_Y - 60 && Math.floor(this.time * 6) % 2 === 0) g.drawImage(dangerLine(), 0, LOSE_Y - 2);
 
     this.drawSlimes(world);
     const gx = Math.round(world.gun.x); // gun and chain move together in whole pixels
@@ -328,9 +335,8 @@ export class Renderer {
       let img = p.spr;
       if (st.orient === 'dir') img = rotated(img, Math.atan2(p.vy, p.vx) + Math.PI / 2);
       else if (st.orient === 'spin') img = rotated(img, p.ang);
-      if (name === 'flame3') g.globalAlpha = 0.6;
-      blit(g, img, p.x, p.y);
-      g.globalAlpha = 1;
+      if (name === 'flame3') { g.globalAlpha = 0.6; blit(g, img, p.x, p.y); g.globalAlpha = 1; }
+      else blit(g, img, p.x, p.y);
     }
   }
 
@@ -396,9 +402,7 @@ export class Renderer {
           if (Math.random() < 0.3) continue;
           const off = (Math.random() * 2 - 1) * 5;
           const X = Math.round(x - ux * len * k + nx * off), Y = Math.round(y - uy * len * k + ny * off);
-          g.fillStyle = Math.random() < 0.5 ? '#ffffff' : light;
-          g.fillRect(X, Y - 1, 1, 3);
-          g.fillRect(X - 1, Y, 3, 1);
+          g.drawImage(twinkle(Math.random() < 0.5 ? '#ffffff' : light), X - 1, Y - 1);
         }
         break;
       }
@@ -639,6 +643,32 @@ function lighter(c) {
   let l = lightCache.get(c);
   if (!l) lightCache.set(c, (l = mix(c, '#ffffff', 0.55)));
   return l;
+}
+
+// Small pictures for things drawn many times a frame: one drawImage instead of several fillRects.
+const twinkles = new Map();
+function twinkle(color) { // a 3 x 3 plus
+  let c = twinkles.get(color);
+  if (!c) {
+    c = makeCanvas(3, 3);
+    const g = c.getContext('2d');
+    g.fillStyle = color;
+    g.fillRect(1, 0, 1, 3);
+    g.fillRect(0, 1, 3, 1);
+    twinkles.set(color, c);
+  }
+  return c;
+}
+
+let danger = null;
+function dangerLine() { // dashes across the playfield
+  if (!danger) {
+    danger = makeCanvas(W, 2);
+    const g = danger.getContext('2d');
+    g.fillStyle = '#ff2a3c';
+    for (let x = 0; x < W; x += 6) g.fillRect(x, 0, 3, 2);
+  }
+  return danger;
 }
 
 

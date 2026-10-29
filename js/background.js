@@ -257,9 +257,20 @@ function buildGrass(rng) {
   return { c, y: top0 };
 }
 
-// copies of a picture every p pixels, only the ones between x0 and x1
-function tiles(g, img, x, y, p, x0, x1) {
-  for (let t = x + Math.floor((x0 - x) / p) * p; t < x1; t += p) if (t + img.width > x0) g.drawImage(img, t, y);
+// copies of a picture every p pixels, only the ones between x0 and x1 (and only its top rows)
+function tiles(g, img, x, y, p, x0, x1, rows = img.height) {
+  const w = img.width;
+  for (let t = x + Math.floor((x0 - x) / p) * p; t < x1; t += p) if (t + w > x0) g.drawImage(img, 0, 0, w, rows, t, y, w, rows);
+}
+
+// first row from which a picture is opaque all the way across and down
+function opaqueFrom(c) {
+  const w = c.width, d = c.getContext('2d').getImageData(0, 0, w, c.height).data;
+  let y = c.height;
+  for (; y > 0; y--) {
+    for (let i = (y - 1) * w * 4 + 3; i < y * w * 4; i += 4) if (d[i] < 255) return y;
+  }
+  return 0;
 }
 
 export class Background {
@@ -286,6 +297,15 @@ export class Background {
       this.clouds.push({ c, x: rng.range(-60, W), y, speed: 2 + ((y + MAX_EXTRA) / (220 + MAX_EXTRA)) * 6 });
     }
     for (const l of this.layers) l.night = nightify(l.c);
+    // Rows hidden behind a layer further in front are never drawn: the landscape is drawn
+    // every frame, and it is most of what gets painted.
+    let cover = Infinity; // everything below this line is hidden
+    for (let i = this.layers.length - 1; i >= 0; i--) {
+      const l = this.layers[i];
+      l.rows = Math.max(0, Math.min(l.c.height, cover - l.y));
+      cover = Math.min(cover, l.y + opaqueFrom(l.c));
+    }
+    this.skyRows = Math.min(H, cover) + MAX_EXTRA;
     for (const c of this.clouds) c.night = nightify(c.c);
   }
 
@@ -309,10 +329,10 @@ export class Background {
       const x = Math.round(l.off) - TILE;
       if (night > 0) {
         g.globalAlpha = night;
-        tiles(g, l.night, x, l.y + oy, TILE, x0, x1);
+        tiles(g, l.night, x, l.y + oy, TILE, x0, x1, l.rows);
         g.globalAlpha = 1;
       }
-      if (day) tiles(g, l.c, x, l.y + oy, TILE, x0, x1);
+      if (day) tiles(g, l.c, x, l.y + oy, TILE, x0, x1, l.rows);
     }
     for (let i = this.clouds.length - 1; i >= 0; i--) {
       const c = this.clouds[i];
@@ -326,10 +346,10 @@ export class Background {
     if (night > 0) {
       g.globalAlpha = night;
       g.drawImage(this.moon, 146, 4); // near the top of the screen
-      tiles(g, this.starrySky(), 0, oy - MAX_EXTRA, STAR_P, x0, x1);
+      tiles(g, this.starrySky(), 0, oy - MAX_EXTRA, STAR_P, x0, x1, this.skyRows);
       g.globalAlpha = 1;
     }
-    if (day) tiles(g, this.sky, 0, oy - MAX_EXTRA, W, x0, x1);
+    if (day) tiles(g, this.sky, 0, oy - MAX_EXTRA, W, x0, x1, this.skyRows);
   }
 
   // The stars twinkle slowly, so the starry night sky is repainted only 20 times a second.

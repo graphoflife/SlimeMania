@@ -7,6 +7,16 @@ let muted = false;
 let voices = 0;
 const MAX_VOICES = 48;
 const last = {};
+// Hits and pops come many times a second. Each is synthesised once, in a few variants, into a
+// buffer and played back from there: building the oscillators and filters for every single
+// hit costs a lot on phones (on the page and on the audio thread).
+const BAKED = ['hit', 'pop0', 'pop1', 'pop2'];
+const VARIANTS = 6;
+const BAKE_LEN = 0.16; // seconds, longer than any of them
+const BAKE_STEP = 2;   // variants set up per task: setting up audio nodes is slow on phones
+const baked = {};
+let baking = false;
+let at = 0; // start of the sound being baked: all variants are rendered one after the other
 
 export function initAudio() {
   if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -26,6 +36,48 @@ export function initAudio() {
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  bakeAll();
+}
+
+// Renders the variants of the frequent sounds in one offline pass, each in its own slot of
+// BAKE_LEN, and cuts them apart. They are set up a few at a time, so the page never stalls.
+// Until they are ready (or if the browser cannot render offline) the sounds are synthesised
+// live as before.
+function bakeAll() {
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!OAC) return;
+  const rate = ctx.sampleRate, len = Math.ceil(rate * BAKE_LEN), n = BAKED.length * VARIANTS;
+  const oc = new OAC(1, len * n, rate);
+  let k = 0;
+  const next = () => {
+    const live = [ctx, master];
+    [ctx, master] = [oc, oc.destination]; // the synth functions play into the offline context
+    baking = true;
+    try {
+      for (const end = Math.min(n, k + BAKE_STEP); k < end; k++) {
+        at = (k * len) / rate;
+        SFX[BAKED[Math.floor(k / VARIANTS)]][1](rnd(0.9, 1.1));
+      }
+    } finally {
+      [ctx, master] = live;
+      baking = false;
+      at = 0;
+    }
+    if (k < n) { setTimeout(next, 20); return; }
+    const done = oc.startRendering();
+    if (!done?.then) return; // old callback-only version: keep synthesising live
+    done.then((all) => {
+      const data = all.getChannelData(0);
+      BAKED.forEach((name, j) => {
+        baked[name] = Array.from({ length: VARIANTS }, (_, i) => {
+          const b = ctx.createBuffer(1, len, rate), s = j * VARIANTS + i;
+          b.getChannelData(0).set(data.subarray(s * len, (s + 1) * len));
+          return b;
+        });
+      });
+    }, () => {});
+  };
+  setTimeout(next, 20);
 }
 
 export function setMuted(m) {
@@ -37,6 +89,7 @@ export function suspendAudio() { if (ctx && ctx.state === 'running') ctx.suspend
 export function resumeAudio() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
 
 function voice(node, dur) {
+  if (baking) return dur;
   voices++;
   node.onended = () => { voices--; };
   return dur;
@@ -44,7 +97,7 @@ function voice(node, dur) {
 
 // oscillator with pitch sweep and a quick envelope
 function tone({ f0, f1 = f0, dur = 0.1, type = 'sine', vol = 0.2, a = 0.003, t = 0, lp = 0 }) {
-  const now = ctx.currentTime + t;
+  const now = ctx.currentTime + at + t;
   const o = ctx.createOscillator();
   const g = ctx.createGain();
   o.type = type;
@@ -70,7 +123,7 @@ function tone({ f0, f1 = f0, dur = 0.1, type = 'sine', vol = 0.2, a = 0.003, t =
 
 // filtered noise burst with a filter sweep
 function noise({ dur = 0.1, vol = 0.2, type = 'bandpass', f0 = 1000, f1 = f0, q = 1, a = 0.002, t = 0 }) {
-  const now = ctx.currentTime + t;
+  const now = ctx.currentTime + at + t;
   const s = ctx.createBufferSource();
   s.buffer = noiseBuf;
   const f = ctx.createBiquadFilter();
@@ -128,5 +181,12 @@ export function sfx(name, pitch = 1) {
   if (now - (last[name] ?? -1) < e[0]) return;
   if (voices > MAX_VOICES) return;
   last[name] = now;
-  e[1](pitch * rnd(0.9, 1.1));
+  const bufs = baked[name];
+  if (!bufs) { e[1](pitch * rnd(0.9, 1.1)); return; }
+  const src = ctx.createBufferSource();
+  src.buffer = bufs[Math.floor(Math.random() * bufs.length)];
+  src.playbackRate.value = pitch;
+  src.connect(master);
+  src.start(now);
+  voice(src);
 }
