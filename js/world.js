@@ -23,6 +23,10 @@ const SPEED_MUL = [0.87, 0.94, 1.01];  // drift speed per size (~28 s from the t
 const BASE_PATH = LOSE_Y - 2 * SLIME_R[0] - 4;
 const STEER = 1.4;               // how quickly a slime eases into its new drift (1/s)
 const KICK_DAMP = 3;             // how quickly recoil fades (1/s)
+const CORE = 0.5;                // big and medium slimes have a soft core of half their size...
+const PUSH = 2;                  // ...and overlapping cores drift apart at this rate (1/s),
+const PUSH_MAX = 40;             // never faster than this (px/s),
+const PUSH_EASE = 7;             // easing into and out of that speed (1/s)
 const GROW_T = 0.5;              // spawn: grow from nothing
 const CHILD_GROW_T = 0.2;        // children grow from CHILD_G0 to full size
 const CHILD_G0 = 0.55;
@@ -107,6 +111,7 @@ export class World {
     this.emitters = [];
     this.gun = { x: W / 2, vx: 0, targetX: W / 2, kick: [0, 0, 0] };
     this.grid = Array.from({ length: COLS }, () => []);
+    this.cores = [];
     this.stamp = 0;
     this.topY = 0; // top edge of the visible sky, set by the game on tall screens
     this.nextId = 1;
@@ -272,7 +277,7 @@ export class World {
     }
     if (target === null) return;
     const o = target, t = bd / v;
-    const best = Math.atan2(o.y + (o.vy + o.ky) * t - p.y, o.x + (o.vx + o.kx) * t - p.x);
+    const best = Math.atan2(o.y + (o.vy + o.ky + o.py) * t - p.y, o.x + (o.vx + o.kx + o.px) * t - p.x);
     p.vx = Math.cos(best) * v;
     p.vy = Math.sin(best) * v;
     if (p.s.orient !== 'spin') p.ang = best;
@@ -306,6 +311,7 @@ export class World {
       id: this.nextId++, size, type, r: SLIME_R[size], x, y,
       vx: 0, vy: 0,          // steering drift
       kx: 0, ky: 0,          // recoil, fades out
+      px: 0, py: 0,          // pushed by overlapping neighbours, eases in and out
       tvx: 0, tvy: 0,        // drift the slime is easing into
       hp, maxHp: hp,
       heading: DOWN, face: DOWN, faceTarget: DOWN, kick: 0,
@@ -379,6 +385,50 @@ export class World {
       if (s.hurt > 0) s.hurt -= dt;
       s.blink -= dt;
       if (s.blink < -0.12) s.blink = this.rng.range(1.5, 5);
+    }
+    this.pushApart(dt);
+  }
+
+  // Big and medium slimes may overlap a bit, but their cores (half their size) do not stay
+  // overlapped: they drift apart, the faster the more they overlap. The push speed eases in
+  // and out, so nothing ever jerks (not even when a neighbour pops). The bigger slime gives
+  // way less.
+  pushApart(dt) {
+    const list = this.cores;
+    list.length = 0;
+    for (const s of this.slimes) {
+      if (s.dead || s.size > 1) continue;
+      s.cr = s.r * CORE * Math.min(1, slimeScale(s));
+      s.tpx = 0; s.tpy = 0; // push speed it should have
+      list.push(s);
+    }
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      for (let j = i + 1; j < list.length; j++) {
+        const b = list[j];
+        const min = a.cr + b.cr;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        if (dx >= min || dx <= -min || dy >= min || dy <= -min) continue;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= min * min) continue;
+        const d = Math.sqrt(d2);
+        const nx = d > 1e-6 ? dx / d : 1, ny = d > 1e-6 ? dy / d : 0;
+        const v = (min - d) * PUSH;
+        const ma = a.r * a.r, mb = b.r * b.r, va = (v * mb) / (ma + mb), vb = v - va;
+        a.tpx -= nx * va; a.tpy -= ny * va;
+        b.tpx += nx * vb; b.tpy += ny * vb;
+      }
+    }
+    const ease = 1 - Math.exp(-PUSH_EASE * dt);
+    for (const s of list) {
+      const v = Math.hypot(s.tpx, s.tpy), cap = v > PUSH_MAX ? PUSH_MAX / v : 1;
+      s.px += (s.tpx * cap - s.px) * ease;
+      s.py += (s.tpy * cap - s.py) * ease;
+      s.x += s.px * dt;
+      s.y += s.py * dt;
+      if (s.x < minX(s)) { s.x = minX(s); if (s.px < 0) s.px = 0; }
+      else if (s.x > maxX(s)) { s.x = maxX(s); if (s.px > 0) s.px = 0; }
+      if (s.y < this.topY + s.r + 4) { s.y = this.topY + s.r + 4; if (s.py < 0) s.py = 0; }
     }
   }
 
@@ -529,7 +579,7 @@ export class World {
     const sp = Math.hypot(p.vx, p.vy) || 1, ux = p.vx / sp, uy = p.vy / sp;
     const rest = p.rest, rx = hx + ux * sp * rest, ry = hy + uy * sp * rest;
     if (cur) {
-      const cvx = cur.vx + cur.kx, cvy = cur.vy + cur.ky;
+      const cvx = cur.vx + cur.kx + cur.px, cvy = cur.vy + cur.ky + cur.py;
       const cx = cur.x + cvx * rest, cy = cur.y + cvy * rest;
       if (Math.hypot(rx - cx, ry - cy) < cur.hr - 3 - Math.hypot(cvx, cvy) * rest) return true;
     }
@@ -542,7 +592,7 @@ export class World {
     for (let i = 0; i < list.length; i++) {
       const o = list[i];
       if (o.dead || o === cur || o.id === ignore) continue;
-      const vx = o.vx + o.kx, vy = o.vy + o.ky;
+      const vx = o.vx + o.kx + o.px, vy = o.vy + o.ky + o.py;
       const t = Math.max(0, ((o.x - rx) * ux + (o.y - ry) * uy) / sp) + rest;
       const ox = o.x + vx * t - rx, oy = o.y + vy * t - ry;
       const r = (o.hr || o.r * 0.55) * 0.65;
