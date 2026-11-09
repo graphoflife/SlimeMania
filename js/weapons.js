@@ -16,7 +16,8 @@
 //
 // Stage parameters (stage 0 = the projectile, 1 = sub projectiles, 2 = sub-sub)
 //   share     fraction of the total damage carried by this stage
-//   hits      how many times it can hit; each hit deals 1/hits of its damage
+//   hits      how many times it can hit; the first hit deals half of its damage, the later hits
+//             share the other half evenly
 //   rest      resting time between two hits (a number, or [min, max] rolled before every hit)
 //   recoil    push on the slime per hit (px/s for a big slime)
 //   rotKick   max random instant rotation of the slime per hit (degrees)
@@ -307,12 +308,15 @@ export function buildStats(def, level, nominalDps) {
   let mult = 1;
   const stages = def.stages.map((s, i) => {
     if (i > 0) mult *= def.stages[i - 1].split.count;
-    return { ...s, dmg: family * s.share / mult / s.hits };
+    // the first hit deals as much as all later hits together
+    const total = family * s.share / mult;
+    const first = s.hits > 1 ? total / 2 : total;
+    return { ...s, total, first, dmg: s.hits > 1 ? total / 2 / (s.hits - 1) : total };
   });
   // damage carried by everything one projectile of a stage would split into
   for (let i = stages.length - 1; i >= 0; i--) {
     const c = stages[i + 1];
-    stages[i].below = c ? stages[i].split.count * (c.dmg * c.hits + c.below) : 0;
+    stages[i].below = c ? stages[i].split.count * (c.total + c.below) : 0;
   }
   return {
     id: def.id, def, level, dps, interval, pulse, stages,

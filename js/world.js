@@ -540,8 +540,9 @@ export class World {
     const s = p.s;
     const rng = this.rng;
     const before = sl.hp;
-    sl.hp -= s.dmg;                    // overkill is simply wasted
-    this.dealt += Math.min(s.dmg, before);
+    const dmg = p.hits === s.hits ? s.first : s.dmg;
+    sl.hp -= dmg;                      // overkill is simply wasted
+    this.dealt += Math.min(dmg, before);
     const sp = Math.hypot(p.vx, p.vy) || 1;
     const k = s.recoil * (SLIME_R[0] / sl.r);
     sl.kx += (p.vx / sp) * k;
@@ -574,7 +575,8 @@ export class World {
     // with dumpFamily the sub-projectiles do not split off: their damage lands here as well
     const family = p.w.dumpFamily && p.s.split && into;
     if (into && (p.hits > 0 || family)) {
-      const extra = p.s.dmg * p.hits + (family ? p.s.below : 0);
+      const own = p.hits === p.s.hits ? p.s.total : p.s.dmg * p.hits;
+      const extra = own + (family ? p.s.below : 0);
       const left = into.hp;
       into.hp -= extra;
       this.dealt += Math.min(extra, left);

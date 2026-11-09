@@ -13,7 +13,8 @@ colours are different. They are re-rolled whenever a level is loaded.
 Every projectile is fast and flies straight up until it hits a slime or leaves the screen. Nothing
 explodes early: a projectile uses up its hits, and only then may it split into new projectiles,
 which hit and split again (plasma goes 2, 4, 8). A projectile that could not hit anything again
-gives all its remaining hits to the slime it is in, so no hits are wasted. Weapons are silent, only
+gives all its remaining hits to the slime it is in, so no hits are wasted. The first hit of a
+projectile deals half of its damage, the later hits share the other half. Weapons are silent, only
 the slime hits and pops make sound.
 
 ## How to play
