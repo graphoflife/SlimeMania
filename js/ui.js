@@ -85,6 +85,7 @@ export class UI {
     $('confirmNo').addEventListener('click', () => { sfx('click'); $('confirm').classList.add('hidden'); });
     $('confirmYes').addEventListener('click', () => game.resetProgress());
     this.buildShop();
+    this.buildSlots();
   }
 
   // ---------------------------------------------------------------- HUD
@@ -211,6 +212,45 @@ export class UI {
     });
   }
 
+  // The equipped weapons below the list, each with its own upgrade button (works like the one
+  // on its card), so upgrading them never needs scrolling.
+  buildSlots() {
+    const box = $('slots');
+    box.innerHTML = '';
+    this.slots = Array.from({ length: MAX_EQUIPPED }, (_, k) => {
+      const el = document.createElement('div');
+      el.className = 'slot';
+      el.innerHTML = `
+        <div class="slot-top"><span class="slot-icon"></span><span class="slot-lv"></span></div>
+        <button class="upbar" aria-label="Upgrade"><i class="uparrow"></i><span class="cost"></span></button>`;
+      const slot = { el, icon: el.querySelector('.slot-icon'), lv: el.querySelector('.slot-lv'), up: el.querySelector('.upbar'), cost: el.querySelector('.cost'), wi: -1 };
+      this.bindHold(slot.up, (turbo) => {
+        const wi = this.game.state.equipped[k];
+        return wi !== undefined && this.game.upgrade(wi, turbo);
+      });
+      box.appendChild(el);
+      return slot;
+    });
+  }
+
+  updateSlots() {
+    const s = this.game.state;
+    this.slots.forEach((slot, k) => {
+      const wi = s.equipped[k] ?? -1;
+      if (slot.wi !== wi) {
+        slot.wi = wi;
+        slot.el.classList.toggle('on', wi >= 0);
+        slot.icon.innerHTML = '';
+        if (wi >= 0) slot.icon.appendChild(iconCanvas(WEAPONS[wi]));
+      }
+      if (wi < 0) { slot.lv.textContent = 'EMPTY'; return; }
+      const lvl = s.levels[wi], cost = upgradeCost(wi, lvl);
+      slot.lv.textContent = 'LV ' + lvl;
+      slot.cost.textContent = fmt(cost, 'ceil');
+      slot.up.classList.toggle('poor', s.money < cost);
+    });
+  }
+
   bindHold(btn, action) {
     let timer = null, start = 0;
     const stop = () => { clearTimeout(timer); timer = null; };
@@ -264,20 +304,7 @@ export class UI {
     let total = 0;
     for (const i of s.equipped) total += shownDps(WEAPONS[i], s.levels[i]);
     $('totalDps').textContent = fmt(total);
-    const slots = $('slots');
-    slots.innerHTML = '';
-    for (let k = 0; k < MAX_EQUIPPED; k++) {
-      const d = document.createElement('div');
-      const wi = s.equipped[k];
-      d.className = 'slot' + (wi !== undefined ? ' on' : '');
-      if (wi !== undefined) {
-        d.appendChild(iconCanvas(WEAPONS[wi]));
-        const t = document.createElement('span');
-        t.textContent = 'LV ' + s.levels[wi];
-        d.appendChild(t);
-      } else d.textContent = 'EMPTY';
-      slots.appendChild(d);
-    }
+    this.updateSlots();
     const next = this.nextWeapon();
     for (const c of this.cards) this.updateCard(c, next);
     this.updateHud();
@@ -329,8 +356,7 @@ export class UI {
     let total = 0;
     for (const k of s.equipped) total += shownDps(WEAPONS[k], s.levels[k]);
     $('totalDps').textContent = fmt(total);
-    const slots = $('slots').children;
-    s.equipped.forEach((wi, k) => { const t = slots[k]?.querySelector('span'); if (t) t.textContent = 'LV ' + s.levels[wi]; });
+    this.updateSlots();
   }
 
   upgraded() { upgradeBlip(); }

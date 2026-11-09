@@ -326,6 +326,11 @@ button {
   color: #fffb;
 }
 .shop-sub b { color: #fff; }
+/* the equipped weapons, below the list */
+.shop-eq {
+  border-top: calc(var(--u)) solid #000;
+  padding-top: calc(var(--u) * 4);
+}
 .slots {
   display: flex;
   gap: calc(var(--u) * 4);
@@ -333,18 +338,43 @@ button {
 }
 .slot {
   flex: 1;
-  height: calc(var(--u) * 22);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 2);
+  padding: calc(var(--u) * 2);
   background: #0006;
   border: calc(var(--u)) solid #000;
   box-shadow: inset 0 0 0 calc(var(--u)) #ffffff18;
+  color: #fff6;
+}
+.slot.on { background: #3ad7ff30; box-shadow: inset 0 0 0 calc(var(--u)) var(--cyan); color: #fff; }
+.slot-top {
+  height: calc(var(--u) * 14);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: calc(var(--u) * 3);
-  color: #fff6;
 }
-.slot.on { background: #3ad7ff30; box-shadow: inset 0 0 0 calc(var(--u)) var(--cyan); color: #fff; }
-.slot canvas { width: calc(var(--u) * 14); height: calc(var(--u) * 14); }
+.slot-icon:empty { display: none; }
+.slot canvas { display: block; width: calc(var(--u) * 14); height: calc(var(--u) * 14); }
+/* upgrade button of an equipped weapon: green arrow (if affordable) and cost */
+.upbar {
+  height: calc(var(--u) * 15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 3);
+  white-space: nowrap;
+  background: #1c4a2a;
+  border: calc(var(--u)) solid #000;
+  box-shadow: inset 0 calc(var(--u) * -2) 0 #0006, inset 0 calc(var(--u)) 0 #fff3;
+  font-weight: 700;
+  text-shadow: calc(var(--u)) calc(var(--u)) 0 #000;
+}
+.upbar:active { transform: translateY(calc(var(--u))); box-shadow: inset 0 calc(var(--u)) 0 #0006; }
+.upbar .cost { color: var(--hi); }
+.slot:not(.on) .upbar { visibility: hidden; }
 
 .shop-list {
   position: relative; /* cards' offsetTop is measured from the list */
@@ -436,10 +466,10 @@ button {
   height: calc(var(--u) * 3);
   background: #3ee35a;
 }
-.upsq.poor { background: #33304a; }
-.upsq.poor .uparrow { border-bottom-color: #5d5875; }
-.upsq.poor .uparrow::after { background: #5d5875; }
-.upsq.poor .cost { color: #fff8; }
+.upsq.poor, .upbar.poor { background: #33304a; }
+.upsq.poor .uparrow, .upbar.poor .uparrow { border-bottom-color: #5d5875; }
+.upsq.poor .uparrow::after, .upbar.poor .uparrow::after { background: #5d5875; }
+.upsq.poor .cost, .upbar.poor .cost { color: #fff8; }
 .upsq.buysq { background: var(--pink); }
 .upsq.buysq.poor { background: #7a2242; }
 
