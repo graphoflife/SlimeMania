@@ -7,6 +7,7 @@ import {
   sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas, mix, blit, blitScaled,
 } from './sprites.js';
 import { slimeScale } from './world.js';
+import { PixLayer } from './pixlayer.js';
 
 const TAU = Math.PI * 2;
 // explosions get the hit sprite at a bigger scale: [scale, screen shake]
@@ -90,6 +91,9 @@ export class Renderer {
     this.nightTarget = 0;
     this.gunSprite = buildGunSprite();
     this.belt = [];        // cached pictures of housing + chain, by phase
+    // Everything in front of the belt (gun, projectiles and their tails, pops and hit sparks)
+    // is drawn into memory and put on the canvas in one go: hundreds of small draw calls less.
+    this.layer = new PixLayer();
   }
 
   // extra rows of sky above the playfield on tall screens
@@ -223,6 +227,7 @@ export class Renderer {
     if (this.canvas.height !== H + this.extra + BOTTOM_BAR) this.setExtra(this.extra);
     const g = this.g;
     const ex = this.extra, height = this.canvas.height;
+    this.layer.resize(W, height, ex);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, W, height);
     const sx = Math.round((Math.random() * 2 - 1) * this.shake);
@@ -240,6 +245,7 @@ export class Renderer {
     this.drawGun(gx, world.gun, world.emitters.length);
     this.drawProjectiles(world);
     this.drawEffects();
+    this.layer.draw(g);
     g.setTransform(1, 0, 0, 1, 0, 0);
     if (this.night > 0) {
       // at night everything in front gets a slightly darker, bluish moonlight tint
@@ -318,7 +324,7 @@ export class Renderer {
   }
 
   drawProjectiles(world) {
-    const g = this.g;
+    const g = this.layer;
     for (const p of world.projs) {
       const st = p.s;
       if (p.trail) this.drawBolt(p.trail);
@@ -342,7 +348,7 @@ export class Renderer {
 
   // Straight tails behind a projectile, as long as the way it has flown so far.
   drawTail(p, st) {
-    const g = this.g;
+    const g = this.layer;
     const sp = Math.hypot(p.vx, p.vy) || 1, ux = p.vx / sp, uy = p.vy / sp;
     const nx = -uy, ny = ux;
     const len = st.trailFrac ? p.dist * st.trailFrac : Math.min(st.trailLen, p.dist);
@@ -402,7 +408,9 @@ export class Renderer {
           if (Math.random() < 0.3) continue;
           const off = (Math.random() * 2 - 1) * 5;
           const X = Math.round(x - ux * len * k + nx * off), Y = Math.round(y - uy * len * k + ny * off);
-          g.drawImage(twinkle(Math.random() < 0.5 ? '#ffffff' : light), X - 1, Y - 1);
+          g.fillStyle = Math.random() < 0.5 ? '#ffffff' : light;
+          g.fillRect(X, Y - 1, 1, 3);
+          g.fillRect(X - 1, Y, 3, 1);
         }
         break;
       }
@@ -410,7 +418,7 @@ export class Renderer {
   }
 
   drawBolt(tr) {
-    const g = this.g;
+    const g = this.layer;
     for (let i = 0; i + 3 < tr.length; i += 2) {
       const x0 = tr[i], y0 = tr[i + 1], x1 = tr[i + 2], y1 = tr[i + 3];
       const mx = (x0 + x1) / 2 + (Math.random() * 2 - 1) * 3, my = (y0 + y1) / 2 + (Math.random() * 2 - 1) * 3;
@@ -422,24 +430,21 @@ export class Renderer {
   }
 
   drawEffects() {
-    const g = this.g;
+    const g = this.layer;
     for (const r of this.rings) {
       const img = ring(r.r * (1 + r.t * 2.4), r.color);
       g.globalAlpha = 1 - r.t / RING_LIFE;
       g.drawImage(img, Math.round(r.x - img.width / 2), Math.round(r.y - img.height / 2));
     }
     g.globalAlpha = 1;
-    let last = null;
     for (const p of this.parts) {
-      const col = p.t > p.life * 0.7 && Math.floor(p.t * 30) % 2 ? '#000000' : p.color;
-      if (col !== last) { g.fillStyle = col; last = col; }
+      g.fillStyle = p.t > p.life * 0.7 && Math.floor(p.t * 30) % 2 ? '#000000' : p.color;
       g.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
     }
     for (const h of this.hits) {
       const f = Math.min(HIT_FRAMES - 1, Math.floor(h.t / 0.05));
       blitScaled(g, rotated(hitFrame(f), h.rot), h.x, h.y, h.sc);
     }
-    g.globalAlpha = 1;
   }
 
   // ---------------------------------------------------------------- chain belt & gun
@@ -539,7 +544,7 @@ export class Renderer {
   }
 
   drawGun(x, gun, slots) {
-    const g = this.g;
+    const g = this.layer;
     const base = CHAIN_Y - SPROCKET_R - 2; // rides on the top run
     const spr = this.gunSprite;
     // barrels: side ones first
@@ -645,21 +650,7 @@ function lighter(c) {
   return l;
 }
 
-// Small pictures for things drawn many times a frame: one drawImage instead of several fillRects.
-const twinkles = new Map();
-function twinkle(color) { // a 3 x 3 plus
-  let c = twinkles.get(color);
-  if (!c) {
-    c = makeCanvas(3, 3);
-    const g = c.getContext('2d');
-    g.fillStyle = color;
-    g.fillRect(1, 0, 1, 3);
-    g.fillRect(0, 1, 3, 1);
-    twinkles.set(color, c);
-  }
-  return c;
-}
-
+// The danger line as one picture: one drawImage instead of 36 fillRects.
 let danger = null;
 function dangerLine() { // dashes across the playfield
   if (!danger) {

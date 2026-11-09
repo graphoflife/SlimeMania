@@ -51,7 +51,7 @@ function rotate(src, ang) {
   const w = x1 - x0 + 1, h = y1 - y0 + 1;
   const crop = new Uint8ClampedArray(w * h * 4);
   for (let y = 0; y < h; y++) crop.set(d.subarray(((y0 + y) * size + x0) * 4, ((y0 + y) * size + x1 + 1) * 4), y * w * 4);
-  const c = canvasFromPixels(w, h, crop);
+  const c = canvasFromPixels(w, h, crop, true); // pixels kept: the pixel layer copies them
   Object.assign(c, { fullW: size, fullH: size, bx: x0, by: y0, ax: cx - x0, ay: cy - y0 });
   return c;
 }
@@ -299,5 +299,5 @@ function buildRing(r, color) {
     const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
     if (d <= r + 0.5 && d > r - 0.7) b.set(x, y, color);
   }
-  return b.canvas();
+  return b.canvas(true); // pixels kept: the pixel layer copies them
 }

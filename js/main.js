@@ -84,10 +84,13 @@ class Game {
     this.renderer.setSide(side);
     this.world.topY = -extra;
     this.redraw = true; // a resized canvas is blank
+    this.rect = null;   // the canvas moved: measured again on the next touch
   }
 
+  // Measuring the page makes the browser lay it out first if anything changed (the HUD changes
+  // all the time), so the canvas position is measured once and kept until the next fit().
   toGameX(clientX) {
-    const r = this.canvas.getBoundingClientRect();
+    const r = this.rect ?? (this.rect = this.canvas.getBoundingClientRect());
     return ((clientX - r.left) / r.width) * W;
   }
 
@@ -375,8 +378,14 @@ class Game {
       const t0 = performance.now();
       while (this.warm.length && performance.now() - t0 < 4) if (this.warm[0].job.next().done) this.warm.shift();
     }
-    const vw = innerWidth, vh = innerHeight;
-    if (vw !== this.vw || vh !== this.vh) { this.vw = vw; this.vh = vh; this.fit(); }
+    // In case a resize event got lost, the size is also checked now and then (not every frame:
+    // reading it makes the browser lay out the page again after every HUD change)
+    this.sizeT = (this.sizeT ?? 0) + dt;
+    if (this.sizeT > 0.5) {
+      this.sizeT = 0;
+      const vw = innerWidth, vh = innerHeight;
+      if (vw !== this.vw || vh !== this.vh) { this.vw = vw; this.vh = vh; this.fit(); }
+    }
     // The world moves in steps of 1/60 s: a frame without a step would show the same picture
     // again (on 90-144 Hz screens that is every other frame or more), so it is not drawn.
     if (n > 0 || this.redraw) {
