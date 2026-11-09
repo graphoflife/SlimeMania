@@ -8,6 +8,7 @@ import {
 } from './sprites.js';
 import { slimeScale } from './world.js';
 import { PixLayer } from './pixlayer.js';
+import { LASER_COLS } from './projectile-art.js';
 
 const TAU = Math.PI * 2;
 // explosions get the hit sprite at a bigger scale: [scale, screen shake]
@@ -23,6 +24,8 @@ const RING_LIFE = 0.22;
 const MERGE_R = 8;
 const MERGE_T = 0.1;
 const MAX_SPARKS = 160;
+// half the length of a laser segment's own sprite: its beam starts this far ahead of it
+const LASER_HALF = 8;
 
 // Chain belt geometry. Links sit exactly PITCH px apart on the straight runs.
 const PITCH = 4;
@@ -385,6 +388,7 @@ export class Renderer {
       const st = p.s;
       if (p.trail) this.drawBolt(p.trail);
       else if (st.trail) this.drawTail(p, st);
+      if (st.trail === 'laser') continue; // its tail is the whole segment, the sprite part included
       let name = st.sprite;
       if (Array.isArray(name)) {
         let f;
@@ -408,15 +412,18 @@ export class Renderer {
     const sp = Math.hypot(p.vx, p.vy) || 1, ux = p.vx / sp, uy = p.vy / sp;
     const nx = -uy, ny = ux;
     const len = st.trailFrac ? p.dist * st.trailFrac : Math.min(st.trailLen, p.dist);
+    if (st.trail === 'laser') {
+      // One straight bar with flat ends that looks the same all along, from the top of its
+      // sprite to the end of its tail: the segments of a pulse fly on one line and join into
+      // one beam.
+      bar(g, p.x, p.y, ux, uy, LASER_HALF, Math.max(len, LASER_HALF), LASER_COLS);
+      return;
+    }
     if (len < 2) return;
     const x1 = p.x - ux * 3, y1 = p.y - uy * 3;           // start just behind the sprite centre
     const ex = p.x - ux * len, ey = p.y - uy * len;       // end of the tail
     const x = p.x, y = p.y;
     switch (st.trail) {
-      case 'laser':
-        pixLine(g, x1, y1, ex, ey, '#ff2a3c', 3);
-        pixLine(g, x1, y1, ex, ey, '#ffd0d6', 1);
-        break;
       case 'tint':
         pixLine(g, x1, y1, ex, ey, p.tint || '#ffffff', 5);
         pixLine(g, x1, y1, x - ux * len * 0.6, y - uy * len * 0.6, '#ffffff', 1);
@@ -691,6 +698,29 @@ function pixLine(g, x0, y0, x1, y1, color, w = 1) {
     x0 = nx; y0 = ny;
   }
   g.fillRect(Math.min(rx, x0) - o, Math.min(ry, y0) - o, Math.abs(x0 - rx) + w, Math.abs(y0 - ry) + w);
+}
+
+// A bar of 1-px wide stripes in the colours `cols`, along the line through (x, y) in direction
+// (ux, uy), from `ahead` in front of (x, y) to `behind` it, with flat ends. Every row (every
+// column, for lines flatter than 45 degrees) takes its pixel position from the line alone, not
+// from where the bar starts, so bars on the same line always line up exactly.
+function bar(g, x, y, ux, uy, ahead, behind, cols) {
+  const vert = Math.abs(uy) >= Math.abs(ux);
+  const m = vert ? y : x, c = vert ? x : y, um = vert ? uy : ux, k = (vert ? ux : uy) / um;
+  const a = m + um * ahead, b = m - um * behind;
+  const m0 = Math.round(Math.min(a, b)), m1 = Math.round(Math.max(a, b));
+  const at = (i) => Math.round(c + (i + 0.5 - m) * k) - (cols.length >> 1); // first stripe of row i
+  let i0 = m0, c0 = at(m0);
+  for (let i = m0 + 1; i <= m1; i++) {
+    const ci = i < m1 ? at(i) : NaN;
+    if (ci === c0) continue;
+    for (let j = 0; j < cols.length; j++) {
+      g.fillStyle = cols[j];
+      if (vert) g.fillRect(c0 + j, i0, 1, i - i0);
+      else g.fillRect(i0, c0 + j, i - i0, 1);
+    }
+    i0 = i; c0 = ci;
+  }
 }
 
 // line along a projectile's tail, from fraction k0 to k1 of its length, off px to the side

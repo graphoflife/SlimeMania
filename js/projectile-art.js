@@ -64,6 +64,10 @@ const BOMB = P('#2f3340', '#727a92', '#16181f', '#000000');
 const ROCK = P('#a8642c', '#d9965a', '#5e3416', '#241004');
 const flat = (fill) => ({ fill });
 
+// The laser is a straight bar with flat ends, the same all along (lit side, white core, shaded
+// side): the renderer draws a whole segment of the beam, tail included, from these columns.
+export const LASER_COLS = ['#ff8a96', '#ff8a96', '#ffffff', '#c0102a', '#c0102a'];
+
 // ---------------------------------------------------------------- canvas builder
 class Art {
   constructor(w, h) {
@@ -200,9 +204,11 @@ const DEFS = {
     return a.dots([[4, 5], [3, 4], [6, 7], [7, 6], [4, 9], [3, 8], [6, 10], [7, 9]], '#7fe870');
   },
 
-  laser: () => A(5, 17)
-    .shape(seg(2.5, 2.5, 2.5, 14.5, 2.1), P('#ff2a3c', '#ff8a96', '#c0102a', '#6a0010'))
-    .shape(seg(2.5, 3, 2.5, 14, 0.7), flat('#ffffff')),
+  laser: () => {
+    const a = A(LASER_COLS.length, 17);
+    LASER_COLS.forEach((c, x) => { for (let y = 0; y < a.h; y++) a.dot(x, y, c); });
+    return a;
+  },
 
   bomb: () => bombArt(13, 16, 5.6),
   bigbomb: () => bombArt(19, 22, 8.3),
