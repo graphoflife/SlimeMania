@@ -66,17 +66,28 @@ export function randomSlimeColors(rng = Math.random) {
 // Beside the playfield the landscape is a little darker, with a stepped shadow along the
 // edges: [distance from the edge, darkness] (the steps add up).
 const SIDE_DIM = 0.3;
+// The landscape moves at most 28 px/s, so at 60 frames a second it only moves every other
+// frame: it is painted into one picture about 30 times a second (this often at most).
+const LAND_DT = 0.025;
 const SIDE_EDGE = [[1, 0.35], [3, 0.16], [6, 0.1], [10, 0.06]];
 const SHADE = '#140f24';
 
 export class Renderer {
   constructor(canvas, backdrop) {
     this.canvas = canvas;
-    this.g = canvas.getContext('2d');
+    // Opaque: the browser can copy it onto the screen instead of blending it, and does not have
+    // to draw the side strips behind it (that matters without a graphics card).
+    this.main = this.g = canvas.getContext('2d', { alpha: false });
     this.g.imageSmoothingEnabled = false;
+    this.front = makeCanvas(1, 1); // at night: the things in front of the landscape, to be tinted
+    this.frontG = this.front.getContext('2d');
     this.backdrop = backdrop; // wide screens: the landscape beside the playfield
     this.bd = backdrop?.getContext('2d');
     this.side = 0;            // columns of landscape on each side
+    this.land = makeCanvas(1, 1); // the landscape, playfield and side strips in one picture
+    this.landG = this.land.getContext('2d');
+    this.landAt = -1;         // when it was painted (-1: paint it now)
+    this.bdDim = -1;          // the dimming the side strips were drawn with
     this.bg = new Background();
     this.colors = randomSlimeColors();
     this.hits = [];
@@ -101,7 +112,7 @@ export class Renderer {
     if (extra === this.extra && this.canvas.height === H + extra + BOTTOM_BAR) return;
     this.extra = extra;
     this.canvas.height = H + extra + BOTTOM_BAR;
-    this.g.imageSmoothingEnabled = false;
+    this.main.imageSmoothingEnabled = false;
   }
 
   // columns of landscape beside the playfield on screens wider than it
@@ -109,6 +120,8 @@ export class Renderer {
     if (!this.backdrop) return;
     this.side = side;
     this.bg.wide = side > 0;
+    this.landAt = -1;
+    this.bdDim = -1;
     this.backdrop.style.display = side > 0 ? '' : 'none';
     if (side > 0) {
       this.backdrop.width = W + 2 * side;
@@ -221,15 +234,26 @@ export class Renderer {
   }
 
   // ---------------------------------------------------------------- drawing
-  // The scene is drawn first onto the empty canvas, the landscape last, behind it. So the
-  // night tint can be laid over the scene alone, without a separate layer.
+  // The landscape first, then everything in front of it. At night the things in front get a
+  // moonlight tint that must not touch the landscape, so they are drawn on a canvas of their
+  // own first, tinted there and then put over the landscape.
   draw(world, opts = {}) {
     if (this.canvas.height !== H + this.extra + BOTTOM_BAR) this.setExtra(this.extra);
-    const g = this.g;
+    const main = this.main;
     const ex = this.extra, height = this.canvas.height;
     this.layer.resize(W, height, ex);
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, W, height);
+    const painted = this.paintLand(); // false, true (all of it) or the rows painted again
+    main.setTransform(1, 0, 0, 1, 0, 0);
+    main.drawImage(this.land, this.side, 0, W, height, 0, 0, W, height);
+    const night = this.night > 0;
+    const g = (this.g = night ? this.frontG : main); // the drawing code below draws on this.g
+    if (night) {
+      if (this.front.width !== W || this.front.height !== height) {
+        this.front.width = W; this.front.height = height; g.imageSmoothingEnabled = false;
+      }
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, W, height);
+    }
     const sx = Math.round((Math.random() * 2 - 1) * this.shake);
     const sy = Math.round((Math.random() * 2 - 1) * this.shake);
     g.setTransform(1, 0, 0, 1, sx, sy + ex);
@@ -247,48 +271,80 @@ export class Renderer {
     this.drawEffects();
     this.layer.draw(g);
     g.setTransform(1, 0, 0, 1, 0, 0);
-    if (this.night > 0) {
+    this.g = main;
+    if (night) {
       // at night everything in front gets a slightly darker, bluish moonlight tint
       g.globalCompositeOperation = 'source-atop';
       g.globalAlpha = NIGHT_TINT_ALPHA * this.night;
       g.fillStyle = NIGHT_TINT;
       g.fillRect(0, 0, W, height);
       g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      main.drawImage(this.front, 0, 0);
     }
-    // the landscape goes behind everything drawn so far
-    g.globalCompositeOperation = 'destination-over';
-    this.bg.draw(g, ex, this.night);
-    g.globalCompositeOperation = 'source-over';
     if (this.flash > 0) {
-      g.globalAlpha = this.flash * 0.45;
-      g.fillStyle = this.flashColor;
-      g.fillRect(0, 0, W, height);
-      g.globalAlpha = 1;
+      main.globalAlpha = this.flash * 0.45;
+      main.fillStyle = this.flashColor;
+      main.fillRect(0, 0, W, height);
+      main.globalAlpha = 1;
     }
     if (opts.dim) {
-      g.globalAlpha = opts.dim;
-      g.fillStyle = SHADE;
-      g.fillRect(0, 0, W, height);
-      g.globalAlpha = 1;
+      main.globalAlpha = opts.dim;
+      main.fillStyle = SHADE;
+      main.fillRect(0, 0, W, height);
+      main.globalAlpha = 1;
     }
-    if (this.side > 0) this.drawBackdrop(opts.dim || 0);
+    // the side strips only change with the landscape picture: redrawing them every frame would
+    // make the browser put the whole screen together again every frame
+    const dim = opts.dim || 0;
+    if (this.side > 0 && (painted || dim !== this.bdDim)) this.drawBackdrop(dim, dim !== this.bdDim || painted);
+  }
+
+  // Paints the landscape picture if it is due: false if nothing changed, true if all of it was
+  // painted, or the row ranges painted again. Only the rows where something moved are painted
+  // again (mostly the grass, sometimes a cloud or the hills).
+  paintLand() {
+    const s = this.side, w = W + 2 * s, h = this.canvas.height, c = this.land;
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; this.landAt = -1; }
+    if (this.landAt >= 0 && this.time - this.landAt < LAND_DT) return false;
+    const rows = this.bg.changedRows(this.night);
+    const all = this.landAt < 0 || !rows;
+    this.landAt = this.time;
+    if (!all && !rows.length) return false;
+    const g = this.landG, ex = this.extra;
+    g.setTransform(1, 0, 0, 1, s, 0); // x = 0 is the left edge of the playfield
+    g.save();
+    if (!all) {
+      g.beginPath();
+      for (const [y0, y1] of rows) g.rect(-s, y0 + ex, w, y1 - y0);
+      g.clip();
+    }
+    g.clearRect(-s, 0, w, h);
+    g.globalCompositeOperation = 'destination-over'; // the landscape is drawn from front to back
+    this.bg.draw(g, ex, this.night, -s, W + s);
+    g.restore();
+    return all || rows;
   }
 
   // The landscape beside the playfield, in step with the one behind it (the game canvas covers
-  // the middle, so only the two side strips are drawn).
-  drawBackdrop(dim) {
-    const g = this.bd, s = this.side, ex = this.extra, height = H + ex + BOTTOM_BAR;
-    if (this.backdrop.height !== height) this.setSide(s);
+  // the middle, so only the two side strips are drawn): all of it, or the given row ranges.
+  drawBackdrop(dim, rows) {
+    this.bdDim = dim;
+    const g = this.bd, s = this.side, height = this.canvas.height;
+    if (this.backdrop.height !== height) { this.setSide(s); rows = true; }
     g.setTransform(1, 0, 0, 1, s, 0); // x = 0 is the left edge of the playfield
-    g.clearRect(-s, 0, W + 2 * s, height);
     g.save();
     g.beginPath();
     g.rect(-s, 0, s, height);
     g.rect(W, 0, s, height);
     g.clip();
-    g.globalCompositeOperation = 'destination-over';
-    this.bg.draw(g, ex, this.night, -s, W + s);
-    g.globalCompositeOperation = 'source-over';
+    if (rows !== true) {
+      g.beginPath();
+      for (const [y0, y1] of rows) g.rect(-s, y0 + this.extra, W + 2 * s, y1 - y0);
+      g.clip();
+    }
+    g.clearRect(-s, 0, W + 2 * s, height);
+    g.drawImage(this.land, -s, 0);
     g.fillStyle = SHADE;
     g.globalAlpha = 1 - (1 - SIDE_DIM) * (1 - dim);
     g.fillRect(-s, 0, W + 2 * s, height);

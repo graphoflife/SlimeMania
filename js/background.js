@@ -318,6 +318,23 @@ export class Background {
     }
   }
 
+  // What has moved since the last call (when the landscape was last painted): the row ranges
+  // [y0, y1) in playfield coordinates that look different now, or null for all of them.
+  changedRows(night) {
+    const pos = this.layers.map((l) => Math.round(l.off)), cl = this.clouds.map((c) => Math.round(c.x));
+    const last = this.shown;
+    this.shown = { pos, cl, night };
+    // the starry sky twinkles: it changes whenever it is painted again
+    const stars = night > 0 && !(this.t - this.starT < 0.05 && this.t >= this.starT && this.starWide === this.wide);
+    if (!last || last.night !== night || stars) return null;
+    const rows = [];
+    this.layers.forEach((l, i) => { if (pos[i] !== last.pos[i]) rows.push([l.y, l.y + l.rows]); });
+    this.clouds.forEach((c, i) => {
+      if (cl[i] !== last.cl[i]) { const y = Math.round(c.y); rows.push([y, y + c.c.height]); }
+    });
+    return rows;
+  }
+
   // oy: rows of extra sky above the playfield. night: 0 = day, 1 = night (cross-fades)
   // x0, x1: the columns to cover (the playfield is 0 to W).
   // Drawn from the front to the back: the caller uses 'destination-over', so every piece goes
