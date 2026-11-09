@@ -23,7 +23,8 @@ the slime hits and pops make sound.
   fullscreen when you start (on iPhone use "Add to Home Screen" instead).
 - **Armory**: buy weapons and upgrade them. Tap a weapon to equip it (up to 3; equipping a fourth
   replaces the one equipped longest ago). Tap the square ▲ button for one level, or hold it for
-  turbo upgrades.
+  turbo upgrades. The equipped weapons are shown at the bottom, each with its own ▲ button, so they
+  can be upgraded without scrolling.
 - **Levels**: clear the first wave of a level to unlock the next one. You can keep farming any
   unlocked level for as long as you like. If a slime reaches the bottom, the level restarts.
 - **Night**: between 20:00 and 06:00 (device clock) the sky turns to night with stars and a moon.
@@ -44,8 +45,8 @@ Progress is saved in the browser (localStorage).
   price.
 - Every step adds +5% DPS. The first 30 upgrades of each weapon also shorten its pulse interval
   down to 50%. After that only damage grows.
-- Slime HP doubles every level. A big slime has 18 HP on level 1, a medium one 1/3 of that and a
-  small one 1/9.
+- Slime HP grows 2.6 times every level. A big slime has 18 HP on level 1, a medium one 1/3 of that
+  and a small one 1/9.
 - You earn exactly the HP of every slime you kill, so income is roughly your DPS.
 - Each weapon's entry step is placed so that the next weapon takes about 5 minutes of play at the
   start and about 10 minutes for the last one (~3.6 h total).

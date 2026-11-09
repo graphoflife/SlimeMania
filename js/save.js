@@ -1,6 +1,6 @@
 // Progress is stored in localStorage.
 import { WEAPONS } from './weapons.js';
-import { weaponStart, effDps, slimeHp, levelCost } from './economy.js';
+import { weaponStart, effDps, slimeHp, levelCost, ECON } from './economy.js';
 
 const KEY = 'slimemania.save.v1';
 
@@ -14,10 +14,13 @@ const V3_IDS = ['mg', 'shotgun', 'water', 'shuriken', 'arrows', 'leaves', 'laser
   'daggers', 'snow', 'popcorn', 'lightning', 'flames', 'nails', 'grenade', 'plasma', 'bubbles', 'saw',
   'bigbomb', 'ice', 'fireworks', 'notes', 'ducks', 'meteor', 'rainbow', 'nova'];
 const RENAMED = { prism: 'rainbow', splitter: 'grenade' };
+// Before v5 the slimes got twice as strong per level (now ECON.HP_GROWTH): an old level becomes
+// the highest new one whose slimes are no stronger, so a save never lands on a level out of reach.
+const fromV4Level = (l) => 1 + Math.floor(((l - 1) * Math.log(2)) / Math.log(ECON.HP_GROWTH) + 1e-9);
 
 export function freshSave() {
   return {
-    v: 4,
+    v: 5,
     money: 0,
     level: 1,       // level being played
     maxLevel: 1,    // highest unlocked level
@@ -36,9 +39,9 @@ export function loadSave() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return s;
     const d = JSON.parse(raw);
-    if (!d || ![1, 2, 3, 4].includes(d.v)) return s;
+    if (!d || ![1, 2, 3, 4, 5].includes(d.v)) return s;
     let byId, equippedIds;
-    if (d.v === 4) {
+    if (d.v >= 4) {
       byId = d.weapons || {};
       equippedIds = d.equippedIds || [];
     } else {
@@ -51,6 +54,7 @@ export function loadSave() {
       equippedIds = d.equipped.map((k) => RENAMED[ids[k]] || ids[k]);
     }
     for (const key of ['money', 'level', 'maxLevel', 'muted', 'hinted', 'sky', 'kills']) if (key in d) s[key] = d[key];
+    if (d.v < 5) { s.level = fromV4Level(s.level); s.maxLevel = fromV4Level(s.maxLevel); }
     s.levels = WEAPONS.map((w) => byId[w.id] || 0);
     if (s.levels[0] < 1) s.levels[0] = 1;
     s.equipped = [...new Set(equippedIds.map((id) => WEAPONS.findIndex((w) => w.id === id)))]
@@ -86,7 +90,7 @@ export function writeSave(s) {
   const { levels, equipped, ...rest } = s;
   const out = {
     ...rest,
-    v: 4,
+    v: 5,
     weapons: Object.fromEntries(WEAPONS.map((w, i) => [w.id, levels[i]]).filter(([, l]) => l > 0)),
     equippedIds: equipped.map((i) => WEAPONS[i].id),
   };

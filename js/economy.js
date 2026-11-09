@@ -13,8 +13,8 @@ export const ECON = {
   RATE_LEVELS: 30,     // the first 30 upgrades of a weapon also shorten its pulse interval ...
   RATE_MIN: 0.5,       // ... down to 50% of the base interval
   H1: 18,              // big slime HP on level 1 (medium = 1/3, small = 1/9)
-  HP_GROWTH: 2,        // slime HP multiplier per level
-  C0: 140,             // price of effective level 2 (the machine gun's first upgrade)
+  HP_GROWTH: 2.6,      // slime HP multiplier per level
+  C0: 133,             // price of effective level 2 (the machine gun's first upgrade)
   COST_GROWTH: 1.0507, // price multiplier per effective level (a bit faster than DPS)
 };
 

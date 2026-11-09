@@ -11,7 +11,7 @@ import { writeFileSync } from 'node:fs';
 import { effDps, levelCost, slimeHp } from '../js/economy.js';
 import { WEAPONS } from '../js/weapons.js';
 
-const LAMBDA = 0.6;       // income per effective DPS when playing near your best level
+const LAMBDA = 0.57;      // income per effective DPS when playing near your best level
 const HUMAN_RHO = 1.4;    // DPS / big-slime-HP a player needs to clear a level (autopilot: ~1.2)
 const SAVE_S = 60;        // the player saves up to a minute of income for the next weapon
 const NW = WEAPONS.length;

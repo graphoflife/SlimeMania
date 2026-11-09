@@ -50,38 +50,38 @@ export const TINTS = {
 export const WEAPONS = [
   {
     id: 'mg', name: 'Machine Gun',
-    interval: U(0.08, 0.008), count: 1, pulse: U(0),
+    interval: U(0.096, 0.0096), count: 1, pulse: U(0),
     speed: U(780, 45), angle: U(0, 2.5),
     stages: [{ sprite: 'bullet', recoil: 1.7, rotKick: 6 }],
   },
   {
     id: 'shotgun', name: 'Shotgun',
-    interval: U(0.9, 0.08), count: 8, pulse: U(0),
+    interval: U(1.08, 0.096), count: 8, pulse: U(0),
     speed: U(720, 90), angle: U(0, 15),
     stages: [{ sprite: 'pellet', orient: 'none', recoil: 2.7, rotKick: 12 }],
   },
   {
     id: 'water', name: 'Water Droplets',
     // a wide spread of speeds stretches every burst into a long shower
-    interval: U(0.8, 0.08), count: 10, pulse: U(0.2, 0.02),
+    interval: U(0.96, 0.096), count: 10, pulse: U(0.2, 0.02),
     speed: U(950, 300), angle: N(0, 2.5),
     stages: [{ sprite: 'drop', recoil: 0.7, rotKick: 4 }],
   },
   {
     id: 'shuriken', name: 'Ninja Stars',
-    interval: U(0.55, 0.1), count: 4, pulse: U(0.18, 0.03), fan: true, fanOrder: [0, 2, 1, 3],
+    interval: U(0.66, 0.12), count: 4, pulse: U(0.18, 0.03), fan: true, fanOrder: [0, 2, 1, 3],
     speed: U(645, 30), angle: U(0, 10),
-    stages: [{ sprite: 'shuriken', orient: 'spin', spin: [16, 24], hits: 5, rest: 0.033, recoil: 1.7, rotKick: 15 }],
+    stages: [{ sprite: 'shuriken', orient: 'spin', spin: [16, 24], hits: 3, rest: 0.055, recoil: 1.7, rotKick: 15 }],
   },
   {
     id: 'arrows', name: 'Arrows',
-    interval: U(0.5, 0.1), count: 3, pulse: U(0.15, 0.03),
+    interval: U(0.6, 0.12), count: 3, pulse: U(0.15, 0.03),
     speed: U(930, 60), angle: U(0, 2),
-    stages: [{ sprite: 'arrow', trail: 'wind', trailLen: 22, hits: 3, rest: 0.04, recoil: 4, rotKick: 10 }],
+    stages: [{ sprite: 'arrow', trail: 'wind', trailLen: 22, hits: 2, rest: 0.06, recoil: 4, rotKick: 10 }],
   },
   {
     id: 'leaves', name: 'Plant Leaves',
-    interval: N(0.45, 0.12), count: 6, pulse: U(0.3, 0.05),
+    interval: N(0.54, 0.144), count: 6, pulse: U(0.3, 0.05),
     speed: U(600, 75), angle: U(0, 25),
     stages: [{ sprite: 'leaf', orient: 'spin', spin: [6, 12], hits: 2, rest: 0.04, recoil: 1, rotKick: 20 }],
   },
@@ -89,13 +89,13 @@ export const WEAPONS = [
     id: 'laser', name: 'Laser',
     // 8 segments leave together, each a step faster than the one behind: they stretch out
     // along one line, and their tails fill the gaps, so it looks like one long beam
-    interval: U(0.45, 0.05), count: 8, pulse: U(0), beam: true,
+    interval: U(0.54, 0.06), count: 8, pulse: U(0), beam: true,
     speed: U(1050, 350), angle: U(0, 1),
-    stages: [{ sprite: 'laser', trail: 'laser', trailFrac: 0.17, hits: 15, rest: 0.017, recoil: 1, rotKick: 5 }],
+    stages: [{ sprite: 'laser', trail: 'laser', trailFrac: 0.17, hits: 10, rest: 0.026, recoil: 1, rotKick: 5 }],
   },
   {
     id: 'bomb', name: 'Small Bomb',
-    interval: U(0.8, 0.15), count: 2, pulse: U(0.2, 0.04),
+    interval: U(0.96, 0.18), count: 2, pulse: U(0.2, 0.04),
     speed: U(600, 30), angle: U(0, 6),
     stages: [
       { sprite: 'bomb', orient: 'spin', spin: [3, 6], share: 0.35, recoil: 4, rotKick: 14,
@@ -105,19 +105,19 @@ export const WEAPONS = [
   },
   {
     id: 'banana', name: 'Banana',
-    interval: U(0.7, 0.2), count: 2, pulse: U(0.25, 0.05),
+    interval: U(0.84, 0.24), count: 2, pulse: U(0.25, 0.05),
     speed: U(630, 60), angle: U(0, 12),
-    stages: [{ sprite: 'banana', orient: 'spin', spin: [10, 15], hits: 5, rest: 0.027, recoil: 1.3, rotKick: 45 }],
+    stages: [{ sprite: 'banana', orient: 'spin', spin: [10, 15], hits: 3, rest: 0.045, recoil: 1.3, rotKick: 45 }],
   },
   {
     id: 'daggers', name: 'Daggers',
-    interval: U(0.55), count: 5, pulse: U(0), sweep: true,
+    interval: U(0.66), count: 5, pulse: U(0), sweep: true,
     speed: U(840, 30), angle: U(0, 16),
     stages: [{ sprite: 'dagger', recoil: 2.7, rotKick: 10 }],
   },
   {
     id: 'popcorn', name: 'Popcorn',
-    interval: U(0.6, 0.15), count: 4, pulse: U(0.25, 0.05),
+    interval: U(0.72, 0.18), count: 4, pulse: U(0.25, 0.05),
     speed: U(630, 60), angle: U(0, 10),
     stages: [
       { sprite: 'kernel', orient: 'none', share: 0.3, recoil: 1, rotKick: 8,
@@ -127,7 +127,7 @@ export const WEAPONS = [
   },
   {
     id: 'lightning', name: 'Lightning',
-    interval: N(0.5, 0.12), count: 1, pulse: U(0),
+    interval: N(0.6, 0.144), count: 1, pulse: U(0),
     speed: U(1350), angle: U(0, 8),
     stages: [
       { sprite: 'bolt', orient: 'none', trail: 'bolt', share: 0.2, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10,
@@ -139,19 +139,19 @@ export const WEAPONS = [
   },
   {
     id: 'flames', name: 'Flames',
-    interval: U(0.12, 0.03), count: 5, pulse: U(0.1, 0.02),
+    interval: U(0.144, 0.036), count: 5, pulse: U(0.1, 0.02),
     speed: U(630, 90), angle: N(0, 7),
-    stages: [{ sprite: ['flame0', 'flame1', 'flame2', 'flame3'], anim: 'age', orient: 'none', hits: 3, rest: 0.033, recoil: 0.3, rotKick: 3 }],
+    stages: [{ sprite: ['flame0', 'flame1', 'flame2', 'flame3'], anim: 'age', orient: 'none', hits: 2, rest: 0.05, recoil: 0.3, rotKick: 3 }],
   },
   {
     id: 'nails', name: 'Nail Gun',
-    interval: U(0.12, 0.04), count: 1, pulse: U(0),
+    interval: U(0.144, 0.048), count: 1, pulse: U(0),
     speed: U(1050, 45), angle: U(0, 4),
     stages: [{ sprite: 'nail', recoil: 1.3, rotKick: 5 }],
   },
   {
     id: 'grenade', name: 'Grenade', dumpFamily: true,
-    interval: U(1.0, 0.15), count: 2, pulse: U(0.3, 0.05),
+    interval: U(1.2, 0.18), count: 2, pulse: U(0.3, 0.05),
     speed: U(600, 30), angle: U(0, 6),
     stages: [
       { sprite: 'grenade', orient: 'spin', spin: [6, 9], share: 0.15, recoil: 3.3, rotKick: 12,
@@ -163,19 +163,19 @@ export const WEAPONS = [
   },
   {
     id: 'plasma', name: 'Plasma',
-    interval: U(0.9, 0.2), count: 2, pulse: U(0.3, 0.05),
+    interval: U(1.08, 0.24), count: 2, pulse: U(0.3, 0.05),
     speed: U(570, 30), angle: U(0, 6),
     stages: [
-      { sprite: ['plasma0', 'plasma1'], anim: 8, orient: 'none', share: 0.25, hits: 5, rest: 0.03, recoil: 1.3, rotKick: 6,
+      { sprite: ['plasma0', 'plasma1'], anim: 8, orient: 'none', share: 0.25, hits: 3, rest: 0.05, recoil: 1.3, rotKick: 6,
         split: { count: 2, mode: 'cone', angle: 30, speedFactor: [0.95, 1.05], fx: 'plasma' } },
-      { sprite: ['plasma_m0', 'plasma_m1'], anim: 8, orient: 'none', aim: true, share: 0.35, hits: 5, rest: 0.03, recoil: 1, rotKick: 6,
+      { sprite: ['plasma_m0', 'plasma_m1'], anim: 8, orient: 'none', aim: true, share: 0.35, hits: 3, rest: 0.05, recoil: 1, rotKick: 6,
         split: { count: 2, mode: 'cone', angle: 30, speedFactor: [0.95, 1.05], fx: 'plasma' } },
-      { sprite: ['plasma_s0', 'plasma_s1'], anim: 8, orient: 'none', aim: true, share: 0.4, hits: 5, rest: 0.03, recoil: 0.7, rotKick: 6 },
+      { sprite: ['plasma_s0', 'plasma_s1'], anim: 8, orient: 'none', aim: true, share: 0.4, hits: 3, rest: 0.05, recoil: 0.7, rotKick: 6 },
     ],
   },
   {
     id: 'bubbles', name: 'Bubbles',
-    interval: N(0.3, 0.06), count: 8, pulse: U(0.25, 0.04),
+    interval: N(0.36, 0.072), count: 8, pulse: U(0.25, 0.04),
     speed: U(585, 60), angle: U(0, 20),
     stages: [
       { sprite: 'bubble', orient: 'none', share: 0.5, recoil: 0.7, rotKick: 8,
@@ -185,19 +185,19 @@ export const WEAPONS = [
   },
   {
     id: 'saw', name: 'Saw Blades',
-    interval: U(1.0, 0.2), count: 2, pulse: U(0.4, 0.05),
+    interval: U(1.2, 0.24), count: 2, pulse: U(0.4, 0.05),
     speed: U(570, 30), angle: U(0, 10),
     stages: [
-      { sprite: 'saw', orient: 'spin', spin: [24, 30], share: 0.3, hits: 6, rest: 0.017, recoil: 0.7, rotKick: 10,
+      { sprite: 'saw', orient: 'spin', spin: [24, 30], share: 0.3, hits: 4, rest: 0.026, recoil: 0.7, rotKick: 10,
         split: { count: 2, mode: 'cone', angle: 35, speedFactor: [0.95, 1.05], fx: 'sparks' } },
-      { sprite: 'saw_m', orient: 'spin', spin: [26, 32], share: 0.35, hits: 6, rest: 0.017, recoil: 0.5, rotKick: 8,
+      { sprite: 'saw_m', orient: 'spin', spin: [26, 32], share: 0.35, hits: 4, rest: 0.026, recoil: 0.5, rotKick: 8,
         split: { count: 2, mode: 'cone', angle: 35, speedFactor: [0.95, 1.05], fx: 'sparks' } },
-      { sprite: 'saw_s', orient: 'spin', spin: [28, 34], share: 0.35, hits: 6, rest: 0.017, recoil: 0.4, rotKick: 6 },
+      { sprite: 'saw_s', orient: 'spin', spin: [28, 34], share: 0.35, hits: 4, rest: 0.026, recoil: 0.4, rotKick: 6 },
     ],
   },
   {
     id: 'bigbomb', name: 'Bigger Bomb', dumpFamily: true,
-    interval: U(1.2, 0.2), count: 1, pulse: U(0),
+    interval: U(1.44, 0.24), count: 1, pulse: U(0),
     speed: U(570), angle: U(0, 4),
     stages: [
       { sprite: 'bigbomb', orient: 'spin', spin: [2, 3.5], share: 0.3, recoil: 6, rotKick: 16,
@@ -209,13 +209,13 @@ export const WEAPONS = [
   },
   {
     id: 'ice', name: 'Ice Shards',
-    interval: U(0.45, 0.1), count: 4, pulse: U(0.1, 0.02), fan: true,
+    interval: U(0.54, 0.12), count: 4, pulse: U(0.1, 0.02), fan: true,
     speed: U(900, 60), angle: U(0, 8),
-    stages: [{ sprite: 'icicle', hits: 3, rest: 0.027, recoil: 2, rotKick: 8 }],
+    stages: [{ sprite: 'icicle', hits: 2, rest: 0.041, recoil: 2, rotKick: 8 }],
   },
   {
     id: 'fireworks', name: 'Fireworks',
-    interval: U(0.8, 0.2), count: 2, pulse: U(0.35, 0.05),
+    interval: U(0.96, 0.24), count: 2, pulse: U(0.35, 0.05),
     speed: U(630, 45), angle: U(0, 10),
     stages: [
       { sprite: 'rocket', trail: 'smoke', trailLen: 20, share: 0.15, recoil: 2, rotKick: 8,
@@ -227,22 +227,22 @@ export const WEAPONS = [
   },
   {
     id: 'notes', name: 'Music Notes',
-    interval: U(0.4, 0.1), count: 3, pulse: U(0.3, 0.05),
+    interval: U(0.48, 0.12), count: 3, pulse: U(0.3, 0.05),
     speed: U(630, 45), angle: U(0, 15),
     stages: [{ sprite: 'note', orient: 'none', tints: TINTS.party, trail: 'staff', trailLen: 30, hits: 2, rest: 0.04, recoil: 1.7, rotKick: 25 }],
   },
   {
     id: 'ducks', name: 'Rubber Ducks',
-    interval: U(0.8, 0.2), count: 2, pulse: U(0.3, 0.05),
+    interval: U(0.96, 0.24), count: 2, pulse: U(0.3, 0.05),
     speed: U(630, 60), angle: U(0, 12),
-    stages: [{ sprite: 'duck', orient: 'spin', spin: [5, 8], hits: 4, rest: 0.033, recoil: 7.3, rotKick: 35 }],
+    stages: [{ sprite: 'duck', orient: 'spin', spin: [5, 8], hits: 3, rest: 0.044, recoil: 7.3, rotKick: 35 }],
   },
   {
     id: 'meteor', name: 'Meteor', dumpFamily: true,
-    interval: U(1.0, 0.2), count: 1, pulse: U(0),
+    interval: U(1.2, 0.24), count: 1, pulse: U(0),
     speed: U(570, 15), angle: U(0, 6),
     stages: [
-      { sprite: 'meteor', trail: 'fire', trailLen: 26, share: 0.3, hits: 3, rest: 0.033, recoil: 5.3, rotKick: 14,
+      { sprite: 'meteor', trail: 'fire', trailLen: 26, share: 0.3, hits: 2, rest: 0.05, recoil: 5.3, rotKick: 14,
         split: { count: 5, mode: 'cone', angle: 50, speed: [570, 690], fx: 'bigboom' } },
       { sprite: 'rock', orient: 'spin', spin: [3, 6], trail: 'fire', trailLen: 14, share: 0.35, hits: 2, rest: 0.033, recoil: 2.7, rotKick: 10,
         split: { count: 4, mode: 'burst', angle: 50, speed: [570, 660], fx: 'boom' } },
@@ -251,20 +251,20 @@ export const WEAPONS = [
   },
   {
     id: 'rainbow', name: 'Rainbow',
-    interval: U(0.2), count: 6, pulse: U(0), sweep: true, tintByFan: true,
+    interval: U(0.24), count: 6, pulse: U(0), sweep: true, tintByFan: true,
     speed: U(840), angle: U(0, 8),
-    stages: [{ sprite: 'rainbow', tints: TINTS.pastel, trail: 'tint', trailLen: 84, hits: 3, rest: [0.02, 0.15], recoil: 1.3, rotKick: 8 }],
+    stages: [{ sprite: 'rainbow', tints: TINTS.pastel, trail: 'tint', trailLen: 84, hits: 2, rest: [0.03, 0.225], recoil: 1.3, rotKick: 8 }],
   },
   {
     id: 'nova', name: 'Supernova',
-    interval: U(0.5, 0.1), count: 1, pulse: U(0),
+    interval: U(0.6, 0.12), count: 1, pulse: U(0),
     speed: U(600), angle: U(0, 4),
     stages: [
-      { sprite: 'star_big', orient: 'spin', spin: [4, 6], tints: TINTS.stars, trail: 'star', trailLen: 140, share: 0.2, hits: 8, rest: 0.033, recoil: 3.3, rotKick: 14,
+      { sprite: 'star_big', orient: 'spin', spin: [4, 6], tints: TINTS.stars, trail: 'star', trailLen: 140, share: 0.2, hits: 6, rest: 0.044, recoil: 3.3, rotKick: 14,
         split: { count: 8, mode: 'burst', angle: 75, speed: [570, 690], tint: 'random', fx: 'nova' } },
-      { sprite: 'star', orient: 'spin', spin: [6, 10], tints: TINTS.stars, trail: 'star', trailLen: 76, aim: true, share: 0.4, hits: 4, rest: 0.033, recoil: 2, rotKick: 10,
+      { sprite: 'star', orient: 'spin', spin: [6, 10], tints: TINTS.stars, trail: 'star', trailLen: 76, aim: true, share: 0.4, hits: 3, rest: 0.044, recoil: 2, rotKick: 10,
         split: { count: 5, mode: 'burst', angle: 60, speed: [570, 690], fx: 'boom_s' } },
-      { sprite: 'spark_w', orient: 'none', aim: true, share: 0.4, hits: 4, rest: 0.027, recoil: 1.3, rotKick: 8 },
+      { sprite: 'spark_w', orient: 'none', aim: true, share: 0.4, hits: 3, rest: 0.036, recoil: 1.3, rotKick: 8 },
     ],
   },
 ];
