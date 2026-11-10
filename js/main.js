@@ -12,6 +12,7 @@ import { botUpdate } from './bot.js';
 import { fmt } from './format.js';
 import { warmJobs, warmSlimes, warmProjectiles } from './sprites.js';
 import { keepScreenOn } from './wakelock.js';
+import { playOffline } from './offline.js';
 
 const STEP = 1 / 60;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -400,3 +401,4 @@ class Game {
 }
 
 window.game = new Game();
+playOffline();

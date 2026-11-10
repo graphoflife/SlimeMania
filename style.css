@@ -1,3 +1,18 @@
+/* Silkscreen pixel font (SIL Open Font License, fonts/OFL.txt), stored here so the game also
+   works offline */
+@font-face {
+  font-family: 'Silkscreen';
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/silkscreen-400.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Silkscreen';
+  font-weight: 700;
+  font-display: swap;
+  src: url(fonts/silkscreen-700.woff2) format('woff2');
+}
+
 :root {
   --u: 2px;               /* one game pixel, set from JS */
   --ink: #000;

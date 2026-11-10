@@ -37,6 +37,17 @@ the slime hits and pops make sound.
 
 Progress is saved in the browser (localStorage).
 
+### Play offline / install as an app
+
+Open the game once with internet. It keeps a copy of all its files on the device, so afterwards it
+also starts without internet. To get an app icon:
+
+- **Android (Chrome)**: menu ⋮ → "Install app" (or "Add to Home screen").
+- **iPhone (Safari)**: Share → "Add to Home Screen".
+
+The installed app opens full screen and keeps the same progress as the website. Online it always
+loads the newest version; offline it uses the stored copy.
+
 ## The numbers
 
 - All weapons share one ladder of levels. DPS and upgrade cost depend only on where a weapon stands
@@ -78,6 +89,7 @@ Balancing tools (Node 18+):
 node tools/balance.mjs --write   # simulate every weapon, write js/balance.js
 node tools/pacing.mjs --write    # place weapon entry steps for 5 -> 10 minute pacing
 node tools/early.mjs             # check that level 1 is easy and level 2 is not
+python3 tools/icons.py           # app icons (icons/*.png) from favicon.svg
 ```
 
 ## Code map
@@ -95,3 +107,4 @@ node tools/early.mjs             # check that level 1 is easy and level 2 is not
 | `js/audio.js` | Synthesised sound effects (WebAudio) |
 | `js/ui.js` | HUD, banners, Armory |
 | `js/main.js` | Main loop, input, level flow |
+| `js/offline.js`, `sw.js` | Offline play: the service worker keeps a copy of every file the game loads |
