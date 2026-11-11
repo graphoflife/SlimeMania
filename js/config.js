@@ -8,7 +8,9 @@ export const MAX_EXTRA = 120;
 export const BOTTOM_BAR = 26;
 
 // Radii of big / medium / small slimes. 3 children have the same area as the parent.
-export const SLIME_R = [39, 22.5, 13];
+// The campaign's bosses are a fourth size.
+export const SLIME_R = [39, 22.5, 13, 58];
+export const BOSS = 3;
 
 // Chain belt & gun
 export const SPROCKET_R = 6;

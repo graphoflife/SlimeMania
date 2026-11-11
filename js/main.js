@@ -1,5 +1,5 @@
 // Boots the game: main loop, input, level flow and the economy actions used by the UI.
-import { W, GUN_MIN_X, GUN_MAX_X, MAX_EQUIPPED, MAX_EXTRA, BOTTOM_BAR } from './config.js';
+import { W, GUN_MIN_X, GUN_MAX_X, MAX_EQUIPPED, MAX_EXTRA, BOTTOM_BAR, BOSS } from './config.js';
 import { World } from './world.js';
 import { RNG } from './rng.js';
 import { WEAPONS, buildStats } from './weapons.js';
@@ -11,6 +11,9 @@ import { initAudio, sfx, setMuted, suspendAudio, resumeAudio } from './audio.js'
 import { botUpdate } from './bot.js';
 import { fmt } from './format.js';
 import { warmJobs, warmSlimes, warmProjectiles } from './sprites.js';
+import { warmKinds } from './kind-art.js';
+import { campaignLevel, clearBonus, HEARTS } from './campaign.js';
+import { KINDS } from './kinds.js';
 import { keepScreenOn } from './wakelock.js';
 import { playOffline } from './offline.js';
 
@@ -24,11 +27,20 @@ class Game {
     this.renderer = new Renderer(this.canvas, document.getElementById('backdrop'));
     this.world = new World(new RNG());
     const params = new URLSearchParams(location.search);
-    if (params.has('testall')) {
-      // build the test save once, then drop the parameter so a reload keeps playing it
-      writeSave(testAllSave());
-      params.delete('testall');
+    // test links change the save once, then the parameter is dropped so a reload keeps playing it
+    const drop = (name) => {
+      params.delete(name);
       history.replaceState(null, '', location.pathname + (params.size ? '?' + params : '') + location.hash);
+    };
+    if (params.has('testall')) { writeSave(testAllSave()); drop('testall'); }
+    if (params.has('campaign')) {
+      // ?campaign=N: straight to campaign level N
+      const s = loadSave(), c = s.campaign, n = Math.max(1, Math.floor(+params.get('campaign')) || 1);
+      c.maxLevel = Math.max(c.maxLevel, n);
+      c.level = n;
+      s.mode = 'campaign';
+      writeSave(s);
+      drop('campaign');
     }
     this.state = loadSave();
     this.mode = 'title';
@@ -45,9 +57,7 @@ class Game {
     // sprites are built ahead of time in idle moments, so nothing has to be built mid-fight
     this.warm = [{ kind: 'base', job: warmJobs() }, { kind: 'belt', job: this.renderer.warmBelt() }];
     setMuted(this.state.muted);
-    if (this.state.maxLevel > 1 || this.state.money > 0) {
-      document.getElementById('tapText').textContent = `TAP TO CONTINUE - LEVEL ${this.state.level}`;
-    }
+    this.ui.refreshTitle();
 
     // title screen demo: the autopilot plays level 1
     this.world.loadLevel(1, slimeHp(1));
@@ -59,7 +69,6 @@ class Game {
     addEventListener('resize', () => this.fit());
     window.visualViewport?.addEventListener('resize', () => this.fit());
     this.bindInput();
-    document.getElementById('title').addEventListener('pointerup', () => this.start(), { once: true });
     // iOS only unlocks audio on certain gestures; any of these will do
     for (const ev of ['touchend', 'click', 'keydown']) addEventListener(ev, () => initAudio(), { once: true });
     document.addEventListener('visibilitychange', () => {
@@ -130,6 +139,10 @@ class Game {
     addEventListener('keyup', (e) => key(e, false));
   }
 
+  // the progress of the mode being played (Zen's is the save itself)
+  get prog() { return this.state.mode === 'campaign' ? this.state.campaign : this.state; }
+  get inCampaign() { return this.state.mode === 'campaign'; }
+
   moved() {
     if (!this.state.hinted) {
       this.state.hinted = true;
@@ -148,14 +161,15 @@ class Game {
     } else if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }
 
-  start() {
+  start(mode) {
     initAudio();
     sfx('click');
     if (matchMedia('(pointer: coarse)').matches) this.toggleFullscreen(true); // phones and tablets
+    this.state.mode = mode;
     this.mode = 'play';
     document.getElementById('title').classList.add('hidden');
     this.ui.showHud(true);
-    this.startLevel(this.state.level);
+    this.startLevel(this.prog.level);
     if (!this.state.hinted) {
       const hint = document.getElementById('hint');
       hint.textContent = matchMedia('(pointer: coarse)').matches ? '< DRAG TO MOVE >' : '< MOUSE OR ARROW KEYS >';
@@ -163,18 +177,55 @@ class Game {
     }
   }
 
+  // Back to the title screen (Settings > MENU), with the demo playing behind it again.
+  toMenu() {
+    writeSave(this.state);
+    this.ui.closeShop();
+    this.ui.showPanel(null);
+    this.ui.showHud(false);
+    this.mode = 'title';
+    this.loseT = 0;
+    this.lv = null;
+    this.renderer.reset();
+    this.world.loadLevel(1, slimeHp(1));
+    this.world.setLoadout([buildStats(WEAPONS[0], 31)]);
+    this.ui.refreshTitle();
+    document.getElementById('title').classList.remove('hidden');
+  }
+
   startLevel(L) {
-    const s = this.state;
-    s.level = clamp(L, 1, s.maxLevel);
+    const p = this.prog;
+    p.level = clamp(L, 1, p.maxLevel);
     this.loseT = 0;
     this.renderer.colors = randomSlimeColors();
     this.queueWarm('slimes', warmSlimes(this.renderer.colors));
     this.renderer.reset();
-    this.world.loadLevel(s.level, slimeHp(s.level));
+    this.ui.showPanel(null);
+    if (this.inCampaign) this.startCampaignLevel(p);
+    else {
+      this.lv = null;
+      this.world.loadLevel(p.level, slimeHp(p.level));
+      this.ui.showBanner(`LEVEL ${p.level}`, `SLIME HP ${fmt(slimeHp(p.level))}`, '#ffffff', 1.8);
+    }
     this.applyLoadout();
     this.world.events.length = 0;
     this.ui.updateHud();
-    this.ui.showBanner(`LEVEL ${s.level}`, `SLIME HP ${fmt(slimeHp(s.level))}`, '#ffffff', 1.8);
+  }
+
+  // A campaign level: its script, three hearts, and a word about slime kinds it brings first.
+  startCampaignLevel(p) {
+    const lv = (this.lv = campaignLevel(p.level));
+    this.hearts = HEARTS;
+    this.ended = false;
+    this.world.loadLevel(p.level, lv.hp, lv.script);
+    this.queueWarm('kinds', warmKinds(lv.script.map((e) => KINDS[e.kind])));
+    const sub = lv.boss ? `${lv.boss.name} IS COMING!` : `WORLD ${lv.world} - SLIME HP ${fmt(lv.hp)}`;
+    this.ui.showBanner(`LEVEL ${p.level}`, sub, '#ffffff', 1.8);
+    const fresh = lv.fresh.filter((k) => k.tip && !p.seen.includes(k.id));
+    fresh.forEach((k, i) => setTimeout(() => {
+      if (this.lv === lv && !this.ended) this.ui.showBanner(`NEW: ${k.name}`, k.tip, '#ffe23a', 2.2);
+    }, 1900 + i * 2300));
+    for (const k of fresh) p.seen.push(k.id);
   }
 
   // Night between 20:00 and 06:00 on the device clock, unless chosen by hand.
@@ -194,13 +245,14 @@ class Game {
   }
 
   setLevel(L) {
-    if (L < 1 || L > this.state.maxLevel || L === this.state.level) return;
+    const p = this.prog;
+    if (L < 1 || L > p.maxLevel || (L === p.level && !this.ended)) return;
     this.startLevel(L);
     writeSave(this.state);
   }
 
   applyLoadout() {
-    const s = this.state;
+    const s = this.prog;
     const stats = s.equipped.map((i) => buildStats(WEAPONS[i], s.levels[i]));
     this.world.setLoadout(stats);
     this.queueWarm('weapons', warmProjectiles(stats));
@@ -221,18 +273,63 @@ class Game {
       switch (e.type) {
         case 'hit': if (!hitSound) { hitSound = true; sfx('hit'); } break;
         case 'pop':
-          this.state.money += e.value;
+          this.prog.money += e.value;
           this.state.kills++;
           this.ui.addGain(e.value);
-          sfx('pop' + e.size);
-          if (e.size === 0) this.ui.bumpMoney();
+          if (e.size === BOSS) sfx('pop0', 0.6);
+          else sfx('pop' + e.size);
+          if (e.size === 0 || e.size === BOSS) this.ui.bumpMoney();
           break;
+        case 'escape': this.onEscape(e); break;
+        case 'levelClear': this.onClear(); break;
+        case 'spawn': if (e.boss) this.ui.showBanner('BOSS!', KINDS[e.k].name, '#ff3a7c', 1.8); break;
         case 'waveStart': if (e.n > 1) this.ui.showBanner(`WAVE ${e.n}`, '', '#ffffff', 1.2, true); break;
         case 'waveClear': this.onWaveClear(e); break;
         case 'lose': this.onLose(); break;
       }
     }
     evs.length = 0;
+  }
+
+  // ---------------------------------------------------------------- campaign results
+  // A slime got through. With no hearts left the level is failed.
+  onEscape(e) {
+    if (this.ended || !e.hearts) return;
+    this.hearts = Math.max(0, this.hearts - e.hearts);
+    this.ui.updateHearts(this.hearts);
+    if (this.hearts > 0) { sfx('deny'); return; }
+    this.ended = true;
+    sfx('lose');
+    this.world.lost = true;
+    // everything on screen bursts (no money for these)
+    for (const s of this.world.slimes) this.renderer.burst(s.x, s.y, s.r, s.size, s.type, s.kind);
+    this.world.slimes.length = 0;
+    this.world.projs.length = 0;
+    this.ui.showPanel('fail');
+    writeSave(this.state);
+  }
+
+  // Everything popped: stars for the hearts left, a bonus, and the next level opens.
+  onClear() {
+    if (this.ended) return;
+    this.ended = true;
+    const p = this.prog, lv = this.lv, stars = this.hearts;
+    const bonus = clearBonus(lv, stars);
+    p.money += bonus;
+    p.stars[lv.n] = Math.max(p.stars[lv.n] ?? 0, stars);
+    if (lv.n === p.maxLevel) p.maxLevel++;
+    sfx('unlock');
+    this.ui.showPanel('clear', { stars, bonus });
+    this.ui.updateHud();
+    writeSave(this.state);
+  }
+
+  // buttons of the level clear / failed panels
+  panelAction(a) {
+    sfx('click');
+    if (a === 'next') this.startLevel(this.prog.level + 1);
+    else if (a === 'replay') this.startLevel(this.prog.level);
+    else if (a === 'shop') this.openShop();
   }
 
   onWaveClear(e) {
@@ -274,7 +371,7 @@ class Game {
   }
 
   upgrade(i, turbo) {
-    const s = this.state;
+    const s = this.prog;
     const cost = upgradeCost(i, s.levels[i]);
     if (s.money < cost) { if (!turbo) sfx('deny'); return false; }
     s.money -= cost;
@@ -286,7 +383,7 @@ class Game {
   }
 
   buyWeapon(i) {
-    const s = this.state;
+    const s = this.prog;
     const price = weaponPrice(i);
     if (s.levels[i] > 0 || s.money < price) { sfx('deny'); return; }
     s.money -= price;
@@ -296,12 +393,12 @@ class Game {
     this.applyLoadout();
     this.ui.refreshShop();
     this.ui.showBanner('NEW WEAPON!', WEAPONS[i].name.toUpperCase(), '#3ad7ff', 1.8);
-    writeSave(s);
+    writeSave(this.state);
   }
 
   // Equipping always works: with 3 already equipped, the one equipped longest ago goes.
   equip(i) {
-    const s = this.state;
+    const s = this.prog;
     if (s.equipped.includes(i)) return;
     s.equipped.push(i);
     if (s.equipped.length > MAX_EQUIPPED) s.equipped.shift();
@@ -309,7 +406,7 @@ class Game {
 
   // Tapping a weapon card: equip it, or unequip it if it is on (one always stays).
   toggleEquip(i) {
-    const s = this.state;
+    const s = this.prog;
     if (s.levels[i] <= 0) return;
     const k = s.equipped.indexOf(i);
     if (k >= 0) {
@@ -366,7 +463,7 @@ class Game {
       }
       if (this.loseT > 0) {
         this.loseT -= dt;
-        if (this.loseT <= 0) this.startLevel(this.state.level);
+        if (this.loseT <= 0) this.startLevel(this.prog.level);
       }
       if (this.mode === 'play') {
         this.saveT += dt;

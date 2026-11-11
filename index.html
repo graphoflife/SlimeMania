@@ -33,9 +33,29 @@
     </div>
   </div>
 
+  <!-- campaign: hearts and the boss's HP, along the top -->
+  <div id="top" class="hidden">
+    <div id="hearts"></div>
+    <div id="bossBar" class="hidden"><div class="bb-name"></div><div class="bb-bar"><i></i></div></div>
+  </div>
+
   <div id="gain"></div>
   <div id="banner"><div class="b-main"></div><div class="b-sub"></div></div>
   <div id="hint" class="hidden">&lt; DRAG TO MOVE &gt;</div>
+
+  <!-- campaign: level cleared / failed -->
+  <div id="panel" class="hidden">
+    <div class="panel-box">
+      <div class="p-title"></div>
+      <div class="p-stars"></div>
+      <div class="p-text"></div>
+      <div class="p-btns">
+        <button class="btn" data-act="shop">ARMORY</button>
+        <button class="btn" data-act="replay">REPLAY</button>
+        <button class="btn go" data-act="next">NEXT</button>
+      </div>
+    </div>
+  </div>
 
   <div id="shop" class="hidden">
     <div class="shop-panel">
@@ -62,6 +82,7 @@
         <div class="c-title">SETTINGS</div>
         <div class="set-row"><span>SOUND</span><div class="seg"><button data-sound="on">ON</button><button data-sound="off">OFF</button></div></div>
         <div class="set-row"><span>SKY</span><div class="seg"><button data-sky="auto">AUTO</button><button data-sky="day">DAY</button><button data-sky="night">NIGHT</button></div></div>
+        <div class="set-row center"><button id="btnMenu" class="btn menu">MAIN MENU</button></div>
         <div class="set-row center"><button id="btnReset" class="btn danger">RESET GAME</button></div>
         <div class="set-row center"><button id="settingsClose" class="btn big">BACK</button></div>
       </div>
@@ -81,7 +102,10 @@
       <br>
       <span style="--c:#c04dff">M</span><span style="--c:#ff3a7c">A</span><span style="--c:#ff8c1a">N</span><span style="--c:#ffe23a">I</span><span style="--c:#3ad7ff">A</span>
     </div>
-    <div class="tap" id="tapText">TAP TO PLAY</div>
+    <div class="modes">
+      <button id="btnZen" class="btn mode"><span class="m-name">ZEN</span><span class="m-sub" id="zenSub">ENDLESS</span></button>
+      <button id="btnCampaign" class="btn mode camp"><span class="m-name">CAMPAIGN</span><span class="m-sub" id="campSub">LEVEL 1</span></button>
+    </div>
     <div class="credits">30 WEAPONS · ENDLESS LEVELS · PURE POP</div>
   </div>
 </div>

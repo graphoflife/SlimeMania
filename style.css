@@ -212,6 +212,72 @@ button {
 }
 #gain.show { opacity: 1; transition: none; }
 
+/* ------------------------------------------------------------------ campaign: hearts, boss bar */
+#top {
+  position: absolute;
+  left: calc(var(--u) * 4); right: calc(var(--u) * 4);
+  top: calc(var(--u) * 4);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 6);
+  pointer-events: none;
+}
+#hearts { display: flex; gap: calc(var(--u) * 2); }
+.px.heart {
+  width: calc(var(--u) * 11); height: calc(var(--u) * 10);
+  color: #ff3a5c;
+  filter: drop-shadow(calc(var(--u)) 0 0 #000) drop-shadow(calc(var(--u) * -1) 0 0 #000) drop-shadow(0 calc(var(--u)) 0 #000) drop-shadow(0 calc(var(--u) * -1) 0 #000);
+}
+.px.heart.lost { color: #3a3550; animation: lost 0.4s steps(4); }
+@keyframes lost { 0% { transform: scale(1.6); color: #fff; } }
+#bossBar { flex: 1; min-width: 0; }
+.bb-name {
+  font-weight: 700;
+  color: #ff9ac4;
+  text-shadow: calc(var(--u)) 0 0 #000, calc(var(--u) * -1) 0 0 #000, 0 calc(var(--u)) 0 #000, 0 calc(var(--u) * -1) 0 #000;
+  margin-bottom: calc(var(--u) * 2);
+}
+.bb-bar { height: calc(var(--u) * 6); background: #000a; border: calc(var(--u)) solid #000; }
+.bb-bar i { display: block; height: 100%; background: linear-gradient(#ff8ad0, #d22eff); transform-origin: left; }
+
+/* ------------------------------------------------------------------ campaign: level result */
+#panel {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  background: #0b071680;
+  padding: calc(var(--u) * 12);
+}
+.panel-box {
+  width: 100%;
+  padding: calc(var(--u) * 10) calc(var(--u) * 8);
+  text-align: center;
+  background: var(--panel);
+  border: calc(var(--u)) solid #000;
+  box-shadow: inset 0 0 0 calc(var(--u)) var(--lime), 0 calc(var(--u) * 3) 0 #000;
+  animation: pop 0.18s steps(6);
+}
+#panel.fail .panel-box { box-shadow: inset 0 0 0 calc(var(--u)) var(--pink), 0 calc(var(--u) * 3) 0 #000; }
+.p-title { font-size: calc(var(--u) * 16); font-weight: 700; color: var(--lime); text-shadow: calc(var(--u) * 2) calc(var(--u) * 2) 0 #000; }
+#panel.fail .p-title { color: var(--pink); }
+.p-stars { display: flex; justify-content: center; gap: calc(var(--u) * 4); margin-top: calc(var(--u) * 8); }
+.p-stars:empty { display: none; }
+.star {
+  width: calc(var(--u) * 20); height: calc(var(--u) * 20);
+  background: #3a3550;
+  clip-path: polygon(50% 0, 63% 35%, 100% 38%, 71% 61%, 81% 100%, 50% 78%, 19% 100%, 29% 61%, 0 38%, 37% 35%);
+}
+.star.on { background: var(--hi); animation: starIn 0.3s steps(5) var(--d) backwards; }
+@keyframes starIn { 0% { transform: scale(2); background: #fff; opacity: 0; } }
+.p-text { margin: calc(var(--u) * 8) 0; font-weight: 700; color: var(--hi); line-height: 1.3; }
+#panel.fail .p-text { color: #fffc; }
+.p-btns { display: flex; justify-content: center; gap: calc(var(--u) * 4); }
+.p-btns .btn { height: calc(var(--u) * 18); min-width: calc(var(--u) * 44); background: #3a5a9a; }
+.p-btns .btn.go { background: var(--lime); color: #000; text-shadow: none; }
+.btn.menu { background: #3a5a9a; height: calc(var(--u) * 18); padding: 0 calc(var(--u) * 10); }
+
 /* ------------------------------------------------------------------ banner */
 #banner {
   position: absolute;
@@ -267,9 +333,23 @@ button {
   align-items: center;
   justify-content: center;
   gap: calc(var(--u) * 18);
-  cursor: pointer;
   padding-bottom: calc(var(--u) * 40);
 }
+/* the two modes */
+.modes { display: flex; flex-direction: column; gap: calc(var(--u) * 6); width: calc(var(--u) * 120); }
+.btn.mode {
+  height: calc(var(--u) * 30);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 3);
+  background: #3a5a9a;
+  box-shadow: inset 0 calc(var(--u) * -3) 0 #0005, inset 0 calc(var(--u)) 0 #fff5, 0 calc(var(--u) * 2) 0 #000;
+}
+.btn.mode.camp { background: var(--pink); }
+.m-name { font-size: calc(var(--u) * 12); }
+.m-sub { font-size: calc(var(--u) * 8); color: var(--hi); }
 .logo {
   text-align: center;
   font-size: calc(var(--u) * 32);
@@ -289,12 +369,6 @@ button {
 .logo span:nth-child(2n) { animation-delay: -0.3s; }
 .logo span:nth-child(3n) { animation-delay: -0.6s; }
 @keyframes bob { 50% { transform: translateY(calc(var(--u) * -3)) scale(1.05, 0.95); } }
-.tap {
-  font-size: calc(var(--u) * 8);
-  font-weight: 700;
-  animation: blink 0.9s steps(2) infinite;
-  text-shadow: calc(var(--u)) 0 0 #000, calc(var(--u) * -1) 0 0 #000, 0 calc(var(--u)) 0 #000, 0 calc(var(--u) * -1) 0 #000, 0 calc(var(--u) * 2) 0 #000;
-}
 .credits {
   position: absolute;
   bottom: calc(var(--u) * 72);

@@ -37,6 +37,19 @@ the slime hits and pops make sound.
 
 Progress is saved in the browser (localStorage).
 
+### Two modes
+
+- **Zen**: the endless mode. One wave repeats; clear it to unlock the next level and farm any
+  level you like.
+- **Campaign**: finish level after level. Every level is a fixed script of slimes (the same every
+  time) that gets longer, denser and stranger, with a mini boss on every 5th and a big boss on
+  every 10th level. You have 3 hearts: every slime that gets through costs one (a boss all three).
+  Clearing pays a bonus and gives 1-3 stars for the hearts left. The campaign has its own money,
+  weapons and upgrades. Settings > MAIN MENU switches modes.
+- Campaign slimes come in kinds, each with its own look and twist: Zippy (fast), Golden (10x
+  coins), Bubble (a bubble soaks up the first hits), Stone (armour: big hits crack it), Mama (pops
+  into five), and bosses such as King Blob (calls for help).
+
 ### Play offline / install as an app
 
 Open the game once with internet. It keeps a copy of all its files on the device, so afterwards it
@@ -80,6 +93,7 @@ python3 tools/serve.py 8080
 Then open http://localhost:8080. Testing helpers:
 
 - `?autoplay` lets the autopilot play.
+- `?campaign=N` jumps to campaign level N.
 - `?testall` replaces the save with every weapon unlocked at equal DPS (the last weapon at level 30)
   and jumps to a matching level. The parameter is removed from the address after loading.
 
@@ -90,6 +104,7 @@ node tools/balance.mjs --write   # simulate every weapon, write js/balance.js
 node tools/pacing.mjs --write    # place weapon entry steps for 5 -> 10 minute pacing
 node tools/early.mjs             # check that level 1 is easy and level 2 is not
 python3 tools/icons.py           # app icons (icons/*.png) from favicon.svg
+node tools/campaign.mjs --write  # fit the campaign's slime HP per level, write js/campaign-table.js
 ```
 
 ## Code map
@@ -107,4 +122,5 @@ python3 tools/icons.py           # app icons (icons/*.png) from favicon.svg
 | `js/audio.js` | Synthesised sound effects (WebAudio) |
 | `js/ui.js` | HUD, banners, Armory |
 | `js/main.js` | Main loop, input, level flow |
+| `js/campaign.js`, `js/kinds.js`, `js/kind-art.js` | Campaign levels, slime kinds and their accessories |
 | `js/offline.js`, `sw.js` | Offline play: the service worker keeps a copy of every file the game loads |

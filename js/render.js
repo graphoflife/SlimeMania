@@ -1,7 +1,9 @@
 // Draws the world onto the low-res canvas and owns all visual-only effects.
 import {
-  W, H, BOTTOM_BAR, CHAIN_Y, SPROCKET_R, SPROCKET_LX, SPROCKET_RX, MUZZLE_Y, LOSE_Y, SLOT_OFFSETS,
+  W, H, BOTTOM_BAR, CHAIN_Y, SPROCKET_R, SPROCKET_LX, SPROCKET_RX, MUZZLE_Y, LOSE_Y, SLOT_OFFSETS, BOSS,
 } from './config.js';
+import { KINDS } from './kinds.js';
+import { kindOverlay, bubbleSprite } from './kind-art.js';
 import { Background } from './background.js';
 import {
   sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas, mix, blit, blitScaled,
@@ -24,6 +26,7 @@ const RING_LIFE = 0.22;
 const MERGE_R = 8;
 const MERGE_T = 0.1;
 const MAX_SPARKS = 160;
+const SIZE_ORDER = [BOSS, 0, 1, 2];
 // half the length of a laser segment's own sprite: its beam starts this far ahead of it
 const LASER_HALF = 8;
 
@@ -151,8 +154,21 @@ export class Renderer {
       }
       hits.push({ x: e.x, y: e.y, t: 0, rot: Math.random() * TAU, sc: 0.8 + Math.random() * 0.4 });
     } else if (e.type === 'pop') {
-      this.burst(e.x, e.y, e.r, e.size, e.kind);
+      this.burst(e.x, e.y, e.r, e.size, e.kind, KINDS[e.k]);
       if (e.size === 0) this.shake = Math.max(this.shake, 1.2);
+      else if (e.size === BOSS) { this.shake = Math.max(this.shake, 3); this.flash = 0.5; this.flashColor = '#ffffff'; }
+    } else if (e.type === 'escape') {
+      // it splats against the belt
+      this.burst(e.x, e.y, e.r, e.size, e.kind, KINDS[e.k]);
+      if (e.hearts) { this.flash = 0.6; this.flashColor = '#ff2a3c'; this.shake = Math.max(this.shake, 2); }
+    } else if (e.type === 'shieldPop') {
+      this.rings.push({ x: e.x, y: e.y, r: e.r + 4, t: 0, color: '#d8f6ff' });
+      this.sparkle(e.x, e.y, 14, ['#ffffff', '#bdeeff', '#8fd8ff'], 50, 110);
+    } else if (e.type === 'summon') {
+      this.rings.push({ x: e.x, y: e.y, r: 10, t: 0, color: '#c9a0ff' });
+    } else if (e.type === 'levelClear') {
+      this.flash = 0.45;
+      this.flashColor = '#ffffff';
     } else if (e.type === 'split') {
       const big = BOOMS[e.fx];
       if (big) {
@@ -174,7 +190,11 @@ export class Renderer {
     }
   }
 
-  colorOf(type, size) { return this.colors[type][size]; }
+  // a slime's colour: its kind's own, or the level's for its type
+  colorOf(type, size, kind) {
+    const c = kind?.colors ?? this.colors[type];
+    return c[size === BOSS ? 0 : size];
+  }
 
   // radial burst of coloured particles (fireworks, saw sparks)
   sparkle(x, y, n, colors, v0, v1) {
@@ -197,11 +217,11 @@ export class Renderer {
   }
 
   // ring + droplets in the slime colour
-  burst(x, y, r, size, kind) {
-    const color = this.colorOf(kind, size);
+  burst(x, y, r, size, type, kind) {
+    const color = this.colorOf(type, size, kind);
     const pal = slimePalette(color);
     this.rings.push({ x, y, r, t: 0, color: pal.light });
-    const n = [16, 10, 7][size];
+    const n = [16, 10, 7, 30][size];
     const list = [];
     for (let i = 0; i < n && this.parts.length + i < 400; i++) {
       const a = Math.random() * TAU;
@@ -361,12 +381,12 @@ export class Renderer {
 
   drawSlimes(world) {
     const g = this.g;
-    // big ones first so the small ones are drawn on top
-    for (let size = 0; size < 3; size++) {
+    // big ones first so the small ones are drawn on top (a boss first of all)
+    for (const size of SIZE_ORDER) {
       for (const s of world.slimes) {
         if (s.size !== size) continue;
         const sqi = clamp(Math.round(s.sq / 0.05) + 2, 0, 4);
-        const body = slimeBody(this.colorOf(s.type, size), size, sqi, s.flash > 0);
+        const body = slimeBody(this.colorOf(s.type, size, s.kind), size, sqi, s.flash > 0);
         const mode = s.hurt > 0 ? 'hurt' : s.blink < 0 ? 'blink' : 'normal';
         const face = rotated(slimeFace(size, mode), s.face + s.kick - Math.PI / 2);
         const sc = slimeScale(s);
@@ -378,7 +398,24 @@ export class Renderer {
           blitScaled(g, body, s.x, s.y, sc);
           blitScaled(g, face, s.x, s.y, sc);
         }
+        if (s.kind && sc > 0.02) this.drawKind(s, size, sqi, sc);
       }
+    }
+  }
+
+  // what a campaign kind wears or carries on top of its body
+  drawKind(s, size, sqi, sc) {
+    const g = this.g, k = s.kind;
+    const over = kindOverlay(k, size, sqi, s.hp / s.maxHp);
+    if (over) { if (sc === 1) blit(g, over, s.x, s.y); else blitScaled(g, over, s.x, s.y, sc); }
+    if (s.shield > 0) { const b = bubbleSprite(size); if (sc === 1) blit(g, b, s.x, s.y); else blitScaled(g, b, s.x, s.y, sc); }
+    if (k.zigzag) {
+      // golden: a twinkle here and there around it
+      const t = Math.floor(this.time * 9), a = ((s.id * 2.3 + t * 1.7) % 6.283), d = s.r * (0.6 + ((t * 7 + s.id) % 5) / 10);
+      const x = Math.round(s.x + Math.cos(a) * d), y = Math.round(s.y + Math.sin(a) * d);
+      g.fillStyle = t % 2 ? '#ffffff' : '#fff7b0';
+      g.fillRect(x - 1, y, 3, 1);
+      g.fillRect(x, y - 1, 1, 3);
     }
   }
 

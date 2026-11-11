@@ -1,9 +1,10 @@
 // The game simulation: gun, slimes, waves, projectiles, hits.
 // Pure logic without DOM access, so tools/*.mjs can run it headless in Node.
 import {
-  W, H, SLIME_R, MUZZLE_Y, LOSE_Y, GUN_MIN_X, GUN_MAX_X,
+  W, H, SLIME_R, BOSS, MUZZLE_Y, LOSE_Y, GUN_MIN_X, GUN_MAX_X,
   GUN_MAX_SPEED, GUN_ACCEL, SLOT_OFFSETS,
 } from './config.js';
+import { KINDS, ARMOR_KEEP } from './kinds.js';
 
 // slime centres stay within the gun's reach, so no slime can hide at the edges
 const minX = (s) => Math.max(s.r, GUN_MIN_X);
@@ -17,7 +18,7 @@ const DOWN = Math.PI / 2;
 const MAX_FACE_DEV = 50 * DEG;   // how far a slime may look away from its travel direction
 const MAX_KICK = 70 * DEG;       // extra rotation hits can add on top of that
 const MAX_UP_DEV = 80 * DEG;     // every projectile flies upwards, at most this far from vertical
-const SPEED_MUL = [0.87, 0.94, 1.01];  // drift speed per size (~28 s from the top to the bottom)
+const SPEED_MUL = [0.87, 0.94, 1.01, 0.87];  // drift speed per size (~28 s from the top to the bottom)
 // Big slimes grow in at the very top of the screen. On tall screens the view reaches above
 // the playfield (topY < 0); slimes then drift faster so the way down takes just as long.
 const BASE_PATH = LOSE_Y - 2 * SLIME_R[0] - 4;
@@ -28,6 +29,7 @@ const PUSH = 2;                  // ...and overlapping cores drift apart at this
 const PUSH_MAX = 40;             // never faster than this (px/s),
 const PUSH_EASE = 7;             // easing into and out of that speed (1/s)
 const MAX_CORE = SLIME_R[0] * CORE;
+const BOSS_CORE = SLIME_R[BOSS] * CORE;
 const GROW_T = 0.5;              // spawn: grow from nothing
 const CHILD_GROW_T = 0.2;        // children grow from CHILD_G0 to full size
 const CHILD_G0 = 0.55;
@@ -126,9 +128,14 @@ export class World {
     this.events.push(data);
   }
 
-  loadLevel(level, bigHp) {
+  // script (campaign): the level's spawns [{ t, x, kind, size, hp (x bigHp), type }], played
+  // once; the level is cleared when all have spawned and the field is empty. Without a script
+  // (Zen) the one fixed wave repeats.
+  loadLevel(level, bigHp, script = null) {
     this.level = level;
     this.bigHp = bigHp;
+    this.script = script;
+    this.boss = null;
     this.slimes.length = 0;
     this.pending.length = 0;
     this.projs.length = 0;
@@ -167,10 +174,23 @@ export class World {
     compact(this.slimes);
     if (this.pending.length) { for (const s of this.pending) if (!s.dead) this.slimes.push(s); this.pending.length = 0; }
     compact(this.projs);
-    this.updateWave(dt);
+    if (this.script) this.updateScript(dt);
+    else this.updateWave(dt);
+    let escaped = false;
     for (const s of this.slimes) {
-      if (s.y + s.r >= LOSE_Y) { this.lost = true; this.ev('lose', { x: s.x, y: s.y }); break; }
+      if (s.y + s.r < LOSE_Y) continue;
+      if (!this.script) { this.lost = true; this.ev('lose', { x: s.x, y: s.y }); break; }
+      this.escape(s);
+      escaped = true;
     }
+    if (escaped) compact(this.slimes);
+  }
+
+  // Campaign: a slime that reaches the bottom splats there and costs hearts (no money, no children).
+  escape(s) {
+    s.dead = true;
+    if (s === this.boss) this.boss = null;
+    this.ev('escape', { x: s.x, y: s.y, r: s.r, size: s.size, kind: s.type, k: s.kind.id, hearts: s.kind.hearts ?? 1 });
   }
 
   // ---------------------------------------------------------------- gun
@@ -308,9 +328,9 @@ export class World {
   }
 
   // ---------------------------------------------------------------- slimes
-  makeSlime(size, x, y, hp, type) {
+  makeSlime(size, x, y, hp, type, kind = null) {
     const s = {
-      id: this.nextId++, size, type, r: SLIME_R[size], x, y,
+      id: this.nextId++, size, type, kind, r: SLIME_R[size], x, y,
       vx: 0, vy: 0,          // steering drift
       kx: 0, ky: 0,          // recoil, fades out
       px: 0, py: 0,          // pushed by overlapping neighbours, eases in and out
@@ -324,6 +344,10 @@ export class World {
       flash: 0, flashCd: 0, hurt: 0, blink: this.rng.range(1, 4), age: 0,
       dead: false, stamp: 0,
     };
+    if (kind) {
+      s.shield = kind.shield ? hp * kind.shield : 0;
+      s.summonT = kind.summon ? kind.summon.every * 0.6 : 0;
+    }
     this.wander(s);
     s.vx = s.tvx;
     s.vy = s.tvy;
@@ -346,9 +370,11 @@ export class World {
     else if (roll < 0.75) { ang = DOWN + rng.sign() * rng.range(0.6, 1.3); spd = rng.range(7, 12); } // drift sideways
     else if (roll < 0.87) { ang = DOWN + rng.range(-0.3, 0.3); spd = rng.range(15, 22); }          // hurry
     else { ang = DOWN + rng.range(-0.8, 0.8); spd = rng.range(1, 4); }                               // dawdle
-    const c = Math.cos(ang);
-    if ((s.x < minX(s) + 10 && c < 0) || (s.x > maxX(s) - 10 && c > 0)) ang = Math.PI - ang;
+    const k = s.kind;
+    if (k?.zigzag) { ang = DOWN + rng.sign() * rng.range(0.9, 1.35); spd = rng.range(22, 34); }  // dart from side to side
+    if ((s.x < minX(s) + 10 && Math.cos(ang) < 0) || (s.x > maxX(s) - 10 && Math.cos(ang) > 0)) ang = Math.PI - ang;
     spd *= SPEED_MUL[s.size] * ((BASE_PATH - this.topY) / BASE_PATH);
+    if (k?.speed) spd *= k.speed;
     s.tvx = Math.cos(ang) * spd;
     s.tvy = Math.sin(ang) * spd;
     s.faceTarget = ang + rng.range(-0.45, 0.45);
@@ -388,6 +414,7 @@ export class World {
       if (s.hurt > 0) s.hurt -= dt;
       s.blink -= dt;
       if (s.blink < -0.12) s.blink = this.rng.range(1.5, 5);
+      if (s.summonT > 0 && (s.summonT -= dt) <= 0) this.summon(s);
     }
     this.pushApart(dt);
   }
@@ -399,7 +426,7 @@ export class World {
   pushApart(dt) {
     const list = this.cores, step = ++this.coreStep;
     for (const s of this.slimes) {
-      if (s.dead || s.size > 1) continue;
+      if (s.dead || s.size === 2) continue;
       if (s.coreStep === 0) list.push(s); // new
       s.coreStep = step;
       s.cr = s.r * CORE * (s.age >= s.growT ? 1 : Math.min(1, slimeScale(s)));
@@ -417,8 +444,9 @@ export class World {
       list[j + 1] = s;
     }
     // sorted by x, each slime only looks at the next ones until they are out of reach
+    const maxCore = this.boss ? BOSS_CORE : MAX_CORE;
     for (let i = 0; i < n; i++) {
-      const a = list[i], ax = a.x, ay = a.y, ar = a.cr, reach = ar + MAX_CORE;
+      const a = list[i], ax = a.x, ay = a.y, ar = a.cr, reach = ar + maxCore;
       for (let j = i + 1; j < n; j++) {
         const b = list[j];
         const dx = b.x - ax;
@@ -454,14 +482,20 @@ export class World {
 
   killSlime(s) {
     s.dead = true;
-    this.earned += s.maxHp;
-    this.ev('pop', { x: s.x, y: s.y, r: s.r, size: s.size, kind: s.type, value: s.maxHp });
-    if (s.size >= 2) return;
+    const kind = s.kind;
+    const value = kind?.value ? s.maxHp * kind.value : s.maxHp;
+    this.earned += value;
+    if (s === this.boss) this.boss = null;
+    this.ev('pop', { x: s.x, y: s.y, r: s.r, size: s.size, kind: s.type, k: kind?.id, value });
+    if (s.size === 2) return;
     const rng = this.rng;
     const base = rng.next() * TAU;
-    for (let k = 0; k < 3; k++) {
-      const a = base + (k * TAU) / 3 + rng.range(-0.3, 0.3);
-      const c = this.makeSlime(s.size + 1, s.x + Math.cos(a) * s.r * 0.42, s.y + Math.sin(a) * s.r * 0.42, s.maxHp / 3, s.type);
+    // a boss pops into big slimes of the level's strength
+    const n = kind?.children ?? 3, size = s.size === BOSS ? 0 : s.size + 1, hp = s.size === BOSS ? this.bigHp : s.maxHp / 3;
+    const ck = kind ? KINDS[kind.childKind ?? kind.id] : null;
+    for (let k = 0; k < n; k++) {
+      const a = base + (k * TAU) / n + rng.range(-0.3, 0.3);
+      const c = this.makeSlime(size, s.x + Math.cos(a) * s.r * 0.42, s.y + Math.sin(a) * s.r * 0.42, hp, s.type, ck);
       c.kx = s.kx * 0.3 + Math.cos(a) * 50;
       c.ky = s.ky * 0.3 + Math.sin(a) * 50;
       c.face = c.faceTarget = s.face + rng.range(-0.6, 0.6);
@@ -470,6 +504,39 @@ export class World {
       c.sqv = 2.5;
       this.pending.push(c);
     }
+  }
+
+  // Takes HP off a slime: whatever the armour and bubble of a campaign kind let through.
+  // hits: how many hits the damage stands for (armour takes its share from each of them).
+  hurt(sl, dmg, hits) {
+    const k = sl.kind;
+    if (k) {
+      if (k.armor) dmg = Math.max(dmg - k.armor * sl.maxHp * hits, dmg * ARMOR_KEEP);
+      if (sl.shield > 0) {
+        const soak = Math.min(sl.shield, dmg);
+        sl.shield -= soak;
+        dmg -= soak;
+        if (sl.shield <= 0) this.ev('shieldPop', { x: sl.x, y: sl.y, r: sl.r });
+      }
+    }
+    const before = sl.hp;
+    sl.hp -= dmg;                      // overkill is simply wasted
+    this.dealt += Math.min(dmg, before);
+  }
+
+  // A boss calls for help: slimes drop out from below it.
+  summon(s) {
+    const sm = s.kind.summon, kind = KINDS[sm.kind];
+    s.summonT = sm.every;
+    for (let i = 0; i < sm.n; i++) {
+      const c = this.makeSlime(0, s.x + (i - (sm.n - 1) / 2) * 56, s.y + s.r * 0.5, this.bigHp * (kind.hp ?? 1), i % 2, kind);
+      c.ky = 50;
+      c.g0 = 0.3;
+      c.growT = 0.4;
+      c.sqv = 2.5;
+      this.pending.push(c);
+    }
+    this.ev('summon', { x: s.x, y: s.y + s.r * 0.5 });
   }
 
   buildGrid() {
@@ -539,10 +606,8 @@ export class World {
   hit(p, sl, hx, hy) {
     const s = p.s;
     const rng = this.rng;
-    const before = sl.hp;
     const dmg = p.hits === s.hits ? s.first : s.dmg;
-    sl.hp -= dmg;                      // overkill is simply wasted
-    this.dealt += Math.min(dmg, before);
+    this.hurt(sl, dmg, 1);
     const sp = Math.hypot(p.vx, p.vy) || 1;
     const k = s.recoil * (SLIME_R[0] / sl.r);
     sl.kx += (p.vx / sp) * k;
@@ -577,9 +642,7 @@ export class World {
     if (into && (p.hits > 0 || family)) {
       const own = p.hits === p.s.hits ? p.s.total : p.s.dmg * p.hits;
       const extra = own + (family ? p.s.below : 0);
-      const left = into.hp;
-      into.hp -= extra;
-      this.dealt += Math.min(extra, left);
+      this.hurt(into, extra, Math.max(1, p.hits));
       this.usedHits += p.hits;
       into.flash = 0.035;
       // show the hit on the slime's edge facing the projectile
@@ -633,6 +696,35 @@ export class World {
       if (d < bd) { bd = d; best = c; }
     }
     return best;
+  }
+
+  // ---------------------------------------------------------------- campaign levels
+  // Like a wave, but played once from the level's script; then the level is cleared.
+  updateScript(dt) {
+    if (this.waveState === 'done') return;
+    const list = this.script;
+    let fieldHp = 0;
+    for (const s of this.slimes) fieldHp += s.hp;
+    this.waveT += dt * (1 + 2 * clamp(1 - fieldHp / (1.5 * this.bigHp), 0, 1));
+    if (this.slimes.length === 0 && this.spawnIdx < list.length) {
+      const nt = list[this.spawnIdx].t;
+      if (nt - this.waveT > FF_GAP) this.waveT = nt - FF_GAP;
+    }
+    while (this.spawnIdx < list.length && list[this.spawnIdx].t <= this.waveT) this.spawnFromScript(list[this.spawnIdx++]);
+    if (this.spawnIdx >= list.length && this.slimes.length === 0 && this.pending.length === 0) {
+      this.waveState = 'done';
+      this.ev('levelClear', { level: this.level });
+    }
+  }
+
+  spawnFromScript(e) {
+    const kind = KINDS[e.kind], size = e.size ?? 0;
+    // a boss starts a little lower, so its HP bar does not cover it
+    const s = this.makeSlime(size, e.x, this.topY + SLIME_R[size] + (size === BOSS ? 20 : 4), this.bigHp * e.hp, e.type, kind);
+    s.sqv = -2;
+    if (size === BOSS) this.boss = s;
+    this.slimes.push(s);
+    this.ev('spawn', { x: s.x, y: s.y, k: kind.id, boss: size === BOSS });
   }
 
   // ---------------------------------------------------------------- waves

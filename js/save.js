@@ -18,9 +18,11 @@ const RENAMED = { prism: 'rainbow', splitter: 'grenade' };
 // the highest new one whose slimes are no stronger, so a save never lands on a level out of reach.
 const fromV4Level = (l) => 1 + Math.floor(((l - 1) * Math.log(2)) / Math.log(ECON.HP_GROWTH) + 1e-9);
 
+// The Zen progress sits at the top level of the save, the campaign's in `campaign`; both have
+// money, level, maxLevel, levels (weapon levels) and equipped. Since v6.
 export function freshSave() {
   return {
-    v: 5,
+    v: 6,
     money: 0,
     level: 1,       // level being played
     maxLevel: 1,    // highest unlocked level
@@ -30,6 +32,37 @@ export function freshSave() {
     hinted: false,
     sky: 'auto',    // 'auto' (night 20:00-06:00 by the clock) | 'day' | 'night'
     kills: 0,
+    mode: 'zen',    // the mode played last: 'zen' | 'campaign'
+    campaign: freshCampaign(),
+  };
+}
+
+export function freshCampaign() {
+  return {
+    money: 0, level: 1, maxLevel: 1,
+    levels: WEAPONS.map((_, i) => (i === 0 ? 1 : 0)),
+    equipped: [0],
+    stars: {},      // level -> best stars
+    seen: [],       // slime kinds already introduced
+  };
+}
+
+// weapons on disk are stored by id
+function weaponsFrom(p, byId, equippedIds) {
+  p.levels = WEAPONS.map((w) => byId[w.id] || 0);
+  if (p.levels[0] < 1) p.levels[0] = 1;
+  p.equipped = [...new Set(equippedIds.map((id) => WEAPONS.findIndex((w) => w.id === id)))]
+    .filter((i) => i >= 0 && p.levels[i] > 0).slice(0, 3);
+  if (!p.equipped.length) p.equipped = [0];
+  if (!isFinite(p.money) || p.money < 0) p.money = 0;
+}
+
+function weaponsTo(p) {
+  const { levels, equipped, ...rest } = p;
+  return {
+    ...rest,
+    weapons: Object.fromEntries(WEAPONS.map((w, i) => [w.id, levels[i]]).filter(([, l]) => l > 0)),
+    equippedIds: equipped.map((i) => WEAPONS[i].id),
   };
 }
 
@@ -39,7 +72,7 @@ export function loadSave() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return s;
     const d = JSON.parse(raw);
-    if (!d || ![1, 2, 3, 4, 5].includes(d.v)) return s;
+    if (!d || ![1, 2, 3, 4, 5, 6].includes(d.v)) return s;
     let byId, equippedIds;
     if (d.v >= 4) {
       byId = d.weapons || {};
@@ -53,14 +86,14 @@ export function loadSave() {
       });
       equippedIds = d.equipped.map((k) => RENAMED[ids[k]] || ids[k]);
     }
-    for (const key of ['money', 'level', 'maxLevel', 'muted', 'hinted', 'sky', 'kills']) if (key in d) s[key] = d[key];
+    for (const key of ['money', 'level', 'maxLevel', 'muted', 'hinted', 'sky', 'kills', 'mode']) if (key in d) s[key] = d[key];
     if (d.v < 5) { s.level = fromV4Level(s.level); s.maxLevel = fromV4Level(s.maxLevel); }
-    s.levels = WEAPONS.map((w) => byId[w.id] || 0);
-    if (s.levels[0] < 1) s.levels[0] = 1;
-    s.equipped = [...new Set(equippedIds.map((id) => WEAPONS.findIndex((w) => w.id === id)))]
-      .filter((i) => i >= 0 && s.levels[i] > 0).slice(0, 3);
-    if (!s.equipped.length) s.equipped = [0];
-    if (!isFinite(s.money) || s.money < 0) s.money = 0;
+    weaponsFrom(s, byId, equippedIds);
+    const c = d.campaign;
+    if (c) {
+      for (const key of ['money', 'level', 'maxLevel', 'stars', 'seen']) if (key in c) s.campaign[key] = c[key];
+      weaponsFrom(s.campaign, c.weapons || {}, c.equippedIds || []);
+    }
   } catch { /* corrupted or blocked storage: start fresh */ }
   return s;
 }
@@ -87,13 +120,7 @@ export function testAllSave() {
 }
 
 export function writeSave(s) {
-  const { levels, equipped, ...rest } = s;
-  const out = {
-    ...rest,
-    v: 5,
-    weapons: Object.fromEntries(WEAPONS.map((w, i) => [w.id, levels[i]]).filter(([, l]) => l > 0)),
-    equippedIds: equipped.map((i) => WEAPONS[i].id),
-  };
+  const out = { ...weaponsTo(s), v: 6, campaign: weaponsTo(s.campaign) };
   try { localStorage.setItem(KEY, JSON.stringify(out)); } catch { /* storage unavailable */ }
 }
 

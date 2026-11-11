@@ -2,6 +2,7 @@
 import { WEAPONS, shownDps } from './weapons.js';
 import { upgradeCost, weaponPrice, ECON } from './economy.js';
 import { MAX_EQUIPPED } from './config.js';
+import { HEARTS } from './campaign.js';
 import { fmt } from './format.js';
 import { sprite, makeCanvas } from './sprites.js';
 import { sfx, upgradeBlip } from './audio.js';
@@ -19,6 +20,7 @@ const ICONS = {
     '..XXXXXX..', '.X.XXXX.X.', '....XX....'],
   full: ['XXXX..XXXX', 'X........X', 'X........X', 'X........X', '..........', '..........', 'X........X',
     'X........X', 'X........X', 'XXXX..XXXX'],
+  heart: ['.XX...XX.', 'XXXX.XXXX', 'XXXXXXXXX', 'XXXXXXXXX', '.XXXXXXX.', '..XXXXX..', '...XXX...', '....X....'],
   cross: ['XX......XX', 'XXX....XXX', '.XXX..XXX.', '..XXXXXX..', '...XXXX...', '...XXXX...', '..XXXXXX..',
     '.XXX..XXX.', 'XXX....XXX', 'XX......XX'],
 };
@@ -71,8 +73,8 @@ export class UI {
     if (document.fullscreenEnabled) $('btnFull').addEventListener('click', () => { sfx('click'); game.toggleFullscreen(); });
     else $('btnFull').classList.add('hidden'); // e.g. iPhone: use "Add to Home Screen" instead
     this.shop.addEventListener('pointerdown', (e) => { if (e.target === this.shop) game.closeShop(); });
-    $('lvPrev').addEventListener('click', () => { sfx('click'); game.setLevel(game.state.level - 1); });
-    $('lvNext').addEventListener('click', () => { sfx('click'); game.setLevel(game.state.level + 1); });
+    $('lvPrev').addEventListener('click', () => { sfx('click'); game.setLevel(game.prog.level - 1); });
+    $('lvNext').addEventListener('click', () => { sfx('click'); game.setLevel(game.prog.level + 1); });
     $('btnSettings').addEventListener('click', () => { sfx('click'); this.refreshSettings(); $('settings').classList.remove('hidden'); });
     $('settingsClose').addEventListener('click', () => { sfx('click'); $('settings').classList.add('hidden'); });
     $('btnReset').addEventListener('click', () => { sfx('click'); $('confirm').classList.remove('hidden'); });
@@ -84,6 +86,15 @@ export class UI {
     }
     $('confirmNo').addEventListener('click', () => { sfx('click'); $('confirm').classList.add('hidden'); });
     $('confirmYes').addEventListener('click', () => game.resetProgress());
+    $('btnZen').addEventListener('click', () => game.start('zen'));
+    $('btnCampaign').addEventListener('click', () => game.start('campaign'));
+    $('btnMenu').addEventListener('click', () => { sfx('click'); game.toMenu(); });
+    this.panel = $('panel');
+    for (const b of this.panel.querySelectorAll('[data-act]')) b.addEventListener('click', () => game.panelAction(b.dataset.act));
+    this.top = $('top');
+    this.bossBar = $('bossBar');
+    this.bossFill = this.bossBar.querySelector('i');
+    $('hearts').innerHTML = Array.from({ length: HEARTS }, () => `<i class="px heart">${pixIcon(ICONS.heart)}</i>`).join('');
     this.buildShop();
     this.buildSlots();
   }
@@ -118,7 +129,7 @@ export class UI {
     this.textT += dt;
     const write = this.textT >= TEXT_DT;
     this.flushGains(dt);
-    const s = this.game.state;
+    const s = this.game.prog;
     const target = s.money;
     if (this.shownMoney !== target) {
       const d = target - this.shownMoney;
@@ -131,8 +142,19 @@ export class UI {
       if (text !== this.moneyText) { this.moneyText = text; this.moneyEl.textContent = text; this.textT = 0; }
     }
     const w = this.game.world;
-    const wave = `WAVE ${w.waveNum}`;
+    const wave = w.script ? `${w.spawnIdx}/${w.script.length}` : `WAVE ${w.waveNum}`;
     if (this.waveCache !== wave) { this.waveCache = wave; $('waveText').textContent = wave; }
+    // the boss's HP bar (its width changes without laying out the page again)
+    const boss = this.game.mode === 'play' ? w.boss : null;
+    if (boss !== this.shownBoss) {
+      this.shownBoss = boss;
+      this.bossBar.classList.toggle('hidden', !boss);
+      if (boss) this.bossBar.querySelector('.bb-name').textContent = boss.kind.name;
+    }
+    if (boss && write) {
+      const f = Math.max(0, boss.hp / boss.maxHp);
+      if (f !== this.bossF) { this.bossF = f; this.bossFill.style.transform = `scaleX(${f})`; }
+    }
   }
 
   bumpMoney() {
@@ -142,7 +164,10 @@ export class UI {
   }
 
   updateHud() {
-    const s = this.game.state;
+    const s = this.game.prog;
+    const camp = this.game.inCampaign;
+    this.top.classList.toggle('hidden', !camp);
+    if (camp) this.updateHearts(this.game.hearts);
     $('lvText').textContent = `LEVEL ${s.level}`;
     $('lvPrev').disabled = s.level <= 1;
     $('lvNext').disabled = s.level >= s.maxLevel;
@@ -151,7 +176,42 @@ export class UI {
     $('btnShop').classList.toggle('attn', next >= 0 && s.money >= weaponPrice(next));
   }
 
-  showHud(on) { this.hud.classList.toggle('hidden', !on); }
+  showHud(on) {
+    this.hud.classList.toggle('hidden', !on);
+    if (!on) this.top.classList.add('hidden');
+    this.shownMoney = this.game.prog.money; // no counting from the other mode's money
+    this.moneyAt = null;
+  }
+
+  updateHearts(n) {
+    $('hearts').querySelectorAll('.heart').forEach((h, i) => h.classList.toggle('lost', i >= n));
+  }
+
+  // The two modes on the title screen, each with where it stands.
+  refreshTitle() {
+    const s = this.game.state, c = s.campaign;
+    $('zenSub').textContent = s.maxLevel > 1 || s.money > 0 ? `LEVEL ${s.level}` : 'ENDLESS';
+    const stars = Object.values(c.stars).reduce((a, b) => a + b, 0);
+    $('campSub').textContent = c.maxLevel > 1 ? `LEVEL ${c.maxLevel} - ${stars}*` : 'LEVEL 1';
+  }
+
+  // Campaign level result: 'clear' { stars, bonus } | 'fail' | null (hide).
+  showPanel(kind, data = {}) {
+    const p = this.panel;
+    p.classList.toggle('hidden', !kind);
+    if (!kind) return;
+    const clear = kind === 'clear';
+    this.banner.classList.remove('show'); // the result says it all
+    this.bannerUntil = 0;
+    p.classList.toggle('fail', !clear);
+    p.querySelector('.p-title').textContent = clear ? 'LEVEL CLEAR!' : 'LEVEL FAILED';
+    p.querySelector('.p-stars').innerHTML = clear
+      ? Array.from({ length: HEARTS }, (_, i) => `<i class="star${i < data.stars ? ' on' : ''}" style="--d:${0.25 + i * 0.25}s"></i>`).join('')
+      : '';
+    p.querySelector('.p-text').textContent = clear ? `BONUS +${fmt(data.bonus)}` : 'UPGRADE YOUR WEAPONS AND TRY AGAIN!';
+    p.querySelector('[data-act=next]').classList.toggle('hidden', !clear);
+    p.querySelector('[data-act=replay]').textContent = clear ? 'REPLAY' : 'RETRY';
+  }
 
   // soft banners never interrupt a banner that is still showing
   showBanner(main, sub = '', color = '#ffffff', dur = 1.6, soft = false) {
@@ -170,7 +230,7 @@ export class UI {
 
   // ---------------------------------------------------------------- shop
   nextWeapon() {
-    const lv = this.game.state.levels;
+    const lv = this.game.prog.levels;
     const i = lv.findIndex((l) => l === 0);
     return i;
   }
@@ -225,7 +285,7 @@ export class UI {
         <button class="upbar" aria-label="Upgrade"><i class="uparrow"></i><span class="cost"></span></button>`;
       const slot = { el, icon: el.querySelector('.slot-icon'), lv: el.querySelector('.slot-lv'), up: el.querySelector('.upbar'), cost: el.querySelector('.cost'), wi: -1 };
       this.bindHold(slot.up, (turbo) => {
-        const wi = this.game.state.equipped[k];
+        const wi = this.game.prog.equipped[k];
         return wi !== undefined && this.game.upgrade(wi, turbo);
       });
       box.appendChild(el);
@@ -234,7 +294,7 @@ export class UI {
   }
 
   updateSlots() {
-    const s = this.game.state;
+    const s = this.game.prog;
     this.slots.forEach((slot, k) => {
       const wi = s.equipped[k] ?? -1;
       if (slot.wi !== wi) {
@@ -279,7 +339,7 @@ export class UI {
     this.refreshShop();
     // start with the lowest equipped weapon of the list at the bottom of the view
     // (layout offsets, not screen rects: the shop pops in with a scale animation)
-    const card = this.cards[Math.max(...this.game.state.equipped)].el;
+    const card = this.cards[Math.max(...this.game.prog.equipped)].el;
     const gap = card.offsetHeight * 0.15;
     this.list.scrollTop = Math.max(0, card.offsetTop + card.offsetHeight + gap - this.list.clientHeight);
   }
@@ -298,7 +358,7 @@ export class UI {
   }
 
   refreshShop() {
-    const s = this.game.state;
+    const s = this.game.prog;
     $('shopMoney').textContent = fmt(s.money);
     $('eqCount').textContent = `${s.equipped.length}/${MAX_EQUIPPED}`;
     let total = 0;
@@ -311,7 +371,7 @@ export class UI {
   }
 
   updateCard(c, next) {
-    const s = this.game.state;
+    const s = this.game.prog;
     const lvl = s.levels[c.i];
     const owned = lvl > 0;
     const isNext = c.i === next;
@@ -347,7 +407,7 @@ export class UI {
 
   // cheap refresh during turbo upgrades
   refreshCard(i) {
-    const s = this.game.state;
+    const s = this.game.prog;
     $('shopMoney').textContent = fmt(s.money);
     const next = this.nextWeapon();
     for (const c of this.cards) {
