@@ -229,6 +229,7 @@ button {
   filter: drop-shadow(calc(var(--u)) 0 0 #000) drop-shadow(calc(var(--u) * -1) 0 0 #000) drop-shadow(0 calc(var(--u)) 0 #000) drop-shadow(0 calc(var(--u) * -1) 0 #000);
 }
 .px.heart.lost { color: #3a3550; animation: lost 0.4s steps(4); }
+.px.heart.part { color: #a83a5c; }
 @keyframes lost { 0% { transform: scale(1.6); color: #fff; } }
 #bossBar { flex: 1; min-width: 0; }
 .bb-name {

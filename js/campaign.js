@@ -54,15 +54,29 @@ export function campaignLevel(n) {
     let x;
     do { x = rng.range(r + 2, W - r - 2); } while (Math.abs(x - lastX) < 40);
     lastX = x;
-    script.push({ t, x, kind: kind.id, size: 0, hp: kind.hp ?? 1, type: i % 2 });
+    script.push({ t, x, kind: kind.id, size: kind.swarm ? 2 : 0, hp: kind.hp ?? 1, type: i % 2 });
     t += rng.next() < 0.12 + n / 300 ? 0.2 : rng.range(0.6, 1.4) * gap; // now and then two at once
   }
   if (boss) {
     script.push({ t: t + 3, x: W / 2, kind: boss.id, size: BOSS, hp: BOSS_HP[n % 10 === 0 ? 1 : 0] * (boss.hp ?? 1), type: 0 });
   }
   const hp = levelHp(n);
-  const value = script.reduce((s, e) => s + worth(KINDS[e.kind], e.size, e.hp * hp, hp), 0);
+  const value = script.reduce((s, e) => s + (KINDS[e.kind].swarm ?? 1) * worth(KINDS[e.kind], e.size, e.hp * hp, hp), 0);
   return { n, world: Math.ceil(n / WORLD_SIZE), boss, script, fresh, hp, value };
+}
+
+// Every kind a level can show: its script's, and what those pop into, call for or shed.
+export function levelKinds(lv) {
+  const out = new Set();
+  const add = (k) => {
+    if (!k || out.has(k)) return;
+    out.add(k);
+    add(KINDS[k.childKind]);
+    add(k.summon && KINDS[k.summon.kind]);
+    add(k.shed && KINDS[k.shed]);
+  };
+  for (const e of lv.script) add(KINDS[e.kind]);
+  return [...out];
 }
 
 // What clearing a level pays on top of its pops.

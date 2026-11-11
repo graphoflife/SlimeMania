@@ -3,7 +3,7 @@ import {
   W, H, BOTTOM_BAR, CHAIN_Y, SPROCKET_R, SPROCKET_LX, SPROCKET_RX, MUZZLE_Y, LOSE_Y, SLOT_OFFSETS, BOSS,
 } from './config.js';
 import { KINDS } from './kinds.js';
-import { kindOverlay, bubbleSprite } from './kind-art.js';
+import { kindOverlays, bubbleSprite } from './kind-art.js';
 import { Background } from './background.js';
 import {
   sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas, mix, blit, blitScaled,
@@ -166,6 +166,21 @@ export class Renderer {
       this.sparkle(e.x, e.y, 14, ['#ffffff', '#bdeeff', '#8fd8ff'], 50, 110);
     } else if (e.type === 'summon') {
       this.rings.push({ x: e.x, y: e.y, r: 10, t: 0, color: '#c9a0ff' });
+    } else if (e.type === 'hop') {
+      this.sparkle(e.x, e.y, 6, ['#ffffff', '#e8e0d0'], 30, 60); // a puff of dust
+    } else if (e.type === 'heal') {
+      if (this.parts.length < 480) this.parts.push({ x: e.x + (Math.random() * 2 - 1) * 6, y: e.y, vx: 0, vy: -45, t: 0, life: 0.7, color: '#3aff7a', size: 1, plus: true });
+    } else if (e.type === 'spit') {
+      this.sparkle(e.x, e.y, 5, ['#7dff3a', '#d0ff8a'], 20, 50);
+    } else if (e.type === 'jam' || e.type === 'gooSplat') {
+      this.sparkle(e.x, e.y, e.type === 'jam' ? 12 : 7, ['#7dff3a', '#d0ff8a', '#3aa01a'], 30, 90);
+      if (e.type === 'jam') this.shake = Math.max(this.shake, 1);
+    } else if (e.type === 'phase') {
+      // a boss loses a plate (rocks fly) or sheds its young (a gooey ring)
+      if (e.k === 'golem') { this.sparkle(e.x, e.y, 22, ['#a3a9ba', '#5d6376', '#2a2d38'], 60, 150); this.shake = Math.max(this.shake, 2); }
+      else this.rings.push({ x: e.x, y: e.y, r: e.r * 0.8, t: 0, color: '#9aeb7a' });
+    } else if (e.type === 'teleport') {
+      this.rings.push({ x: e.x, y: e.y, r: e.r * 0.7, t: 0, color: '#e2dcff' });
     } else if (e.type === 'levelClear') {
       this.flash = 0.45;
       this.flashColor = '#ffffff';
@@ -289,8 +304,9 @@ export class Renderer {
     this.drawSlimes(world);
     const gx = Math.round(world.gun.x); // gun and chain move together in whole pixels
     this.drawBelt(gx);
-    this.drawGun(gx, world.gun, world.emitters.length);
+    this.drawGun(gx, world.gun, world.emitters);
     this.drawProjectiles(world);
+    if (world.goo.length) this.drawGoo(world.goo);
     this.drawEffects();
     this.layer.draw(g);
     g.setTransform(1, 0, 0, 1, 0, 0);
@@ -387,7 +403,8 @@ export class Renderer {
         if (s.size !== size) continue;
         const sqi = clamp(Math.round(s.sq / 0.05) + 2, 0, 4);
         const body = slimeBody(this.colorOf(s.type, size, s.kind), size, sqi, s.flash > 0);
-        const mode = s.hurt > 0 ? 'hurt' : s.blink < 0 ? 'blink' : 'normal';
+        const mode = s.hurt > 0 ? 'hurt' : s.blink < 0 ? 'blink' : s.kind?.rage ? 'angry' : 'normal';
+        if (s.kind?.ghost) g.globalAlpha = 0.18 + 0.62 * s.fade; // ghosts are see-through, and fade
         const face = rotated(slimeFace(size, mode), s.face + s.kick - Math.PI / 2);
         const sc = slimeScale(s);
         if (sc === 1) {
@@ -399,6 +416,7 @@ export class Renderer {
           blitScaled(g, face, s.x, s.y, sc);
         }
         if (s.kind && sc > 0.02) this.drawKind(s, size, sqi, sc);
+        g.globalAlpha = 1;
       }
     }
   }
@@ -406,8 +424,10 @@ export class Renderer {
   // what a campaign kind wears or carries on top of its body
   drawKind(s, size, sqi, sc) {
     const g = this.g, k = s.kind;
-    const over = kindOverlay(k, size, sqi, s.hp / s.maxHp);
-    if (over) { if (sc === 1) blit(g, over, s.x, s.y); else blitScaled(g, over, s.x, s.y, sc); }
+    for (const over of kindOverlays(s, size, sqi)) {
+      if (!over) continue; // e.g. a golem without plates left
+      if (sc === 1) blit(g, over, s.x, s.y); else blitScaled(g, over, s.x, s.y, sc);
+    }
     if (s.shield > 0) { const b = bubbleSprite(size); if (sc === 1) blit(g, b, s.x, s.y); else blitScaled(g, b, s.x, s.y, sc); }
     if (k.zigzag) {
       // golden: a twinkle here and there around it
@@ -529,6 +549,17 @@ export class Renderer {
     }
   }
 
+  // goo blobs spat at the gun
+  drawGoo(goo) {
+    const g = this.layer;
+    for (const b of goo) {
+      const x = Math.round(b.x), y = Math.round(b.y);
+      g.fillStyle = '#000000'; g.fillRect(x - 2, y - 3, 5, 7); g.fillRect(x - 1, y - 5, 3, 2);
+      g.fillStyle = '#7dff3a'; g.fillRect(x - 1, y - 2, 3, 5); g.fillRect(x, y - 4, 1, 2);
+      g.fillStyle = '#d0ff8a'; g.fillRect(x - 1, y - 2, 1, 2);
+    }
+  }
+
   drawEffects() {
     const g = this.layer;
     for (const r of this.rings) {
@@ -539,7 +570,9 @@ export class Renderer {
     g.globalAlpha = 1;
     for (const p of this.parts) {
       g.fillStyle = p.t > p.life * 0.7 && Math.floor(p.t * 30) % 2 ? '#000000' : p.color;
-      g.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
+      const x = Math.round(p.x), y = Math.round(p.y);
+      if (p.plus) { g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } // a healing plus
+      else g.fillRect(x, y, p.size, p.size);
     }
     for (const h of this.hits) {
       const f = Math.min(HIT_FRAMES - 1, Math.floor(h.t / 0.05));
@@ -643,8 +676,8 @@ export class Renderer {
     }
   }
 
-  drawGun(x, gun, slots) {
-    const g = this.layer;
+  drawGun(x, gun, emitters) {
+    const g = this.layer, slots = emitters.length;
     const base = CHAIN_Y - SPROCKET_R - 2; // rides on the top run
     const spr = this.gunSprite;
     // barrels: side ones first
@@ -666,6 +699,12 @@ export class Renderer {
       if (active && gun.kick[s] > 0.8) {
         g.fillStyle = '#ffe23a'; g.fillRect(bx - 2, y0 - 3, 5, 2);
         g.fillStyle = '#ffffff'; g.fillRect(bx - 1, y0 - 4, 3, 2);
+      }
+      if (active && emitters[s].jam > 0) {
+        // goo stuck in the muzzle, dripping down the barrel
+        g.fillStyle = '#000000'; g.fillRect(lx - 2, y0 - 3, w + 4, 6);
+        g.fillStyle = '#7dff3a'; g.fillRect(lx - 1, y0 - 2, w + 2, 4); g.fillRect(bx, y0 + 2, 1, 3 + Math.round(emitters[s].jam * 2));
+        g.fillStyle = '#d0ff8a'; g.fillRect(lx - 1, y0 - 2, 2, 1);
       }
     }
     g.drawImage(spr, x - Math.floor(spr.width / 2), base - spr.height + 2);

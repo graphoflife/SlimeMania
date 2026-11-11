@@ -46,9 +46,25 @@ Progress is saved in the browser (localStorage).
   every 10th level. You have 3 hearts: every slime that gets through costs one (a boss all three).
   Clearing pays a bonus and gives 1-3 stars for the hearts left. The campaign has its own money,
   weapons and upgrades. Settings > MAIN MENU switches modes.
-- Campaign slimes come in kinds, each with its own look and twist: Zippy (fast), Golden (10x
-  coins), Bubble (a bubble soaks up the first hits), Stone (armour: big hits crack it), Mama (pops
-  into five), and bosses such as King Blob (calls for help).
+- Campaign slimes come in kinds, each with its own look and twist, introduced one by one:
+
+  | Kind | Twist |
+  | --- | --- |
+  | Zippy (sweatband) | fast, but little HP |
+  | Golden | darts around; 10x coins, costs no heart |
+  | Bubble | a soap bubble soaks up the first hits |
+  | Hopper (feet) | leaps aside now and then |
+  | Stone (cracks) | armour: every hit loses a bit, so big hits win |
+  | Mama (bow) | pops into five |
+  | Gloop (drips) | soft: one hit takes at most a little, so many small hits win |
+  | Grumpy (angry brows) | the more it is hurt, the faster it goes |
+  | Ghost (see-through) | fades out now and then; shots pass through it then |
+  | Medic (nurse's cap) | heals the slimes around it |
+  | Spitter (puffed cheeks) | spits goo; goo on the gun jams a barrel for a moment |
+  | Swarm (bees) | clusters of tiny fast ones (a quarter heart each) |
+
+- Bosses, in turn: King Blob (calls for help), Rock Golem (stone plates that break off), Phantom
+  (fades and reappears elsewhere), Gloop Mother (sheds Gloops), Spitter Tank (goo volleys).
 
 ### Play offline / install as an app
 

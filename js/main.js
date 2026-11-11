@@ -12,7 +12,7 @@ import { botUpdate } from './bot.js';
 import { fmt } from './format.js';
 import { warmJobs, warmSlimes, warmProjectiles } from './sprites.js';
 import { warmKinds } from './kind-art.js';
-import { campaignLevel, clearBonus, HEARTS } from './campaign.js';
+import { campaignLevel, clearBonus, levelKinds, HEARTS } from './campaign.js';
 import { KINDS } from './kinds.js';
 import { keepScreenOn } from './wakelock.js';
 import { playOffline } from './offline.js';
@@ -218,7 +218,7 @@ class Game {
     this.hearts = HEARTS;
     this.ended = false;
     this.world.loadLevel(p.level, lv.hp, lv.script);
-    this.queueWarm('kinds', warmKinds(lv.script.map((e) => KINDS[e.kind])));
+    this.queueWarm('kinds', warmKinds(levelKinds(lv)));
     const sub = lv.boss ? `${lv.boss.name} IS COMING!` : `WORLD ${lv.world} - SLIME HP ${fmt(lv.hp)}`;
     this.ui.showBanner(`LEVEL ${p.level}`, sub, '#ffffff', 1.8);
     const fresh = lv.fresh.filter((k) => k.tip && !p.seen.includes(k.id));
@@ -281,6 +281,8 @@ class Game {
           if (e.size === 0 || e.size === BOSS) this.ui.bumpMoney();
           break;
         case 'escape': this.onEscape(e); break;
+        case 'jam': sfx('deny'); break;
+        case 'phase': sfx('pop0', 0.75); break;
         case 'levelClear': this.onClear(); break;
         case 'spawn': if (e.boss) this.ui.showBanner('BOSS!', KINDS[e.k].name, '#ff3a7c', 1.8); break;
         case 'waveStart': if (e.n > 1) this.ui.showBanner(`WAVE ${e.n}`, '', '#ffffff', 1.2, true); break;
@@ -295,9 +297,9 @@ class Game {
   // A slime got through. With no hearts left the level is failed.
   onEscape(e) {
     if (this.ended || !e.hearts) return;
-    this.hearts = Math.max(0, this.hearts - e.hearts);
+    this.hearts = Math.max(0, this.hearts - e.hearts); // a swarm slime costs a quarter
     this.ui.updateHearts(this.hearts);
-    if (this.hearts > 0) { sfx('deny'); return; }
+    if (this.hearts > 1e-6) { sfx('deny'); return; }
     this.ended = true;
     sfx('lose');
     this.world.lost = true;
@@ -313,7 +315,7 @@ class Game {
   onClear() {
     if (this.ended) return;
     this.ended = true;
-    const p = this.prog, lv = this.lv, stars = this.hearts;
+    const p = this.prog, lv = this.lv, stars = Math.max(1, Math.round(this.hearts));
     const bonus = clearBonus(lv, stars);
     p.money += bonus;
     p.stars[lv.n] = Math.max(p.stars[lv.n] ?? 0, stars);

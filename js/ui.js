@@ -184,7 +184,10 @@ export class UI {
   }
 
   updateHearts(n) {
-    $('hearts').querySelectorAll('.heart').forEach((h, i) => h.classList.toggle('lost', i >= n));
+    $('hearts').querySelectorAll('.heart').forEach((h, i) => {
+      h.classList.toggle('lost', n <= i + 1e-6);
+      h.classList.toggle('part', n > i + 1e-6 && n < i + 1 - 1e-6); // swarm slimes take quarters
+    });
   }
 
   // The two modes on the title screen, each with where it stands.

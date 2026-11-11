@@ -143,11 +143,11 @@ function buildBody(color, size, sqi, flash) {
 }
 
 // Face sprites, drawn facing DOWN and scaled to the slime radius;
-// rotated at draw time around the slime centre. mode: normal | hurt | blink
+// rotated at draw time around the slime centre. mode: normal | hurt | blink | angry
 const faceBase = [];
-const FACE_MODES = { normal: 0, hurt: 1, blink: 2 };
+const FACE_MODES = { normal: 0, hurt: 1, blink: 2, angry: 3 };
 export function slimeFace(size, mode) {
-  const k = size * 3 + FACE_MODES[mode];
+  const k = size * 4 + FACE_MODES[mode];
   return faceBase[k] || (faceBase[k] = buildFace(size, mode));
 }
 
@@ -191,11 +191,17 @@ function buildFace(size, mode) {
       ellipse(ex, ey, erx, ery, '#fff');
       ellipse(ex, ey + ery * 0.32, erx * 0.62, ery * 0.6, '#000'); // pupil looks forward
     }
+    // angry: brows slanting down towards the middle
+    if (mode === 'angry') line(ex + s * erx * 1.5, ey - ery * 2, ex - s * erx * 0.6, ey - ery * 1.15, t + (size === 0 ? 1 : 0));
   }
   const my = r * 0.5, mw = r * 0.16;
   if (mode === 'hurt') {
     ellipse(0, my, Math.max(1.5, r * 0.09), Math.max(1.5, r * 0.11), '#000');
     if (size < 2) ellipse(0, my + r * 0.03, r * 0.05, r * 0.05, '#c0103a');
+  } else if (mode === 'angry') {
+    // frown: upper half of a circle
+    const mr = mw;
+    for (let a = 0.15; a <= Math.PI - 0.15; a += 0.08) dot(Math.cos(a) * mr - t / 2, my + mr * 0.3 - Math.sin(a) * mr * 0.7 - t / 2, t, t, '#000');
   } else {
     // smile: lower half of a circle
     const mr = mw;
