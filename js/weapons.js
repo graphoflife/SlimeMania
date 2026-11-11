@@ -24,6 +24,9 @@
 //   trail     tail look: bolt | laser | wind | staff | fire | tint | star | smoke (trailLen px)
 //   aim       a shot that would obviously miss when it appears turns towards the closest slime
 //             (in any direction, the only exception to "always upwards")
+//   slow      a hit slows the slime's drift by this fraction for a moment (ice)
+//   burn      this share of every hit's damage burns off over a moment instead (flames)
+//   chain     this share of the damage arcs to the nearest other slime with the last hit (lightning)
 //   split     sub projectiles released where the last hit lands:
 //             { count, mode: 'burst' (spread around straight up) | 'cone' | 'fan' (around the
 //               parent), angle, speed | speedFactor, tint, fx (explosion look) }
@@ -135,14 +138,14 @@ export const WEAPONS = [
         split: { count: 2, mode: 'cone', angle: 35, speedFactor: [0.9, 1.1] } },
       { sprite: 'bolt', orient: 'none', trail: 'bolt', aim: true, share: 0.35, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10,
         split: { count: 2, mode: 'cone', angle: 35, speedFactor: [0.9, 1.1] } },
-      { sprite: 'bolt', orient: 'none', trail: 'bolt', aim: true, share: 0.45, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10 },
+      { sprite: 'bolt', orient: 'none', trail: 'bolt', aim: true, share: 0.45, hits: 2, rest: 0.02, recoil: 1.3, rotKick: 10, chain: 0.35 },
     ],
   },
   {
     id: 'flames', name: 'Flames',
     interval: U(0.144, 0.036), count: 5, pulse: U(0.1, 0.02),
     speed: U(630, 90), angle: N(0, 7),
-    stages: [{ sprite: ['flame0', 'flame1', 'flame2', 'flame3'], anim: 'age', orient: 'none', hits: 2, rest: 0.05, recoil: 0.3, rotKick: 3 }],
+    stages: [{ sprite: ['flame0', 'flame1', 'flame2', 'flame3'], anim: 'age', orient: 'none', hits: 2, rest: 0.05, recoil: 0.3, rotKick: 3, burn: 0.4 }],
   },
   {
     id: 'nails', name: 'Nail Gun',
@@ -212,7 +215,7 @@ export const WEAPONS = [
     id: 'ice', name: 'Ice Shards',
     interval: U(0.54, 0.12), count: 4, pulse: U(0.1, 0.02), fan: true,
     speed: U(900, 60), angle: U(0, 8),
-    stages: [{ sprite: 'icicle', hits: 2, rest: 0.041, recoil: 2, rotKick: 8 }],
+    stages: [{ sprite: 'icicle', hits: 2, rest: 0.041, recoil: 2, rotKick: 8, slow: 0.35 }],
   },
   {
     id: 'fireworks', name: 'Fireworks',
@@ -285,7 +288,7 @@ function balance(id, level) {
 
 const STAGE_DEFAULTS = {
   orient: 'dir', spin: [0, 0], share: 1, hits: 1, rest: 0.033, recoil: 1.7, rotKick: 8,
-  split: null, trail: null, tints: null, anim: null,
+  split: null, trail: null, tints: null, anim: null, slow: 0, burn: 0, chain: 0,
 };
 
 WEAPONS.forEach((w, i) => { w.index = i; });
@@ -308,15 +311,15 @@ export function buildStats(def, level, nominalDps) {
   let mult = 1;
   const stages = def.stages.map((s, i) => {
     if (i > 0) mult *= def.stages[i - 1].split.count;
-    // the first hit deals as much as all later hits together
-    const total = family * s.share / mult;
+    // the first hit deals as much as all later hits together (an arc takes its share first)
+    const all = family * s.share / mult, total = all * (1 - s.chain);
     const first = s.hits > 1 ? total / 2 : total;
-    return { ...s, total, first, dmg: s.hits > 1 ? total / 2 / (s.hits - 1) : total };
+    return { ...s, total, arc: all * s.chain, first, dmg: s.hits > 1 ? total / 2 / (s.hits - 1) : total };
   });
   // damage carried by everything one projectile of a stage would split into
   for (let i = stages.length - 1; i >= 0; i--) {
     const c = stages[i + 1];
-    stages[i].below = c ? stages[i].split.count * (c.total + c.below) : 0;
+    stages[i].below = c ? stages[i].split.count * (c.total + c.arc + c.below) : 0;
   }
   return {
     id: def.id, def, level, dps, interval, pulse, stages,

@@ -4,6 +4,7 @@ import {
 } from './config.js';
 import { KINDS } from './kinds.js';
 import { kindOverlays, bubbleSprite } from './kind-art.js';
+import { WeaponFx } from './weapon-fx.js';
 import { Background } from './background.js';
 import {
   sprite, rotated, slimeBody, slimeFace, slimePalette, hitFrame, HIT_FRAMES, ring, makeCanvas, mix, blit, blitScaled,
@@ -111,6 +112,7 @@ export class Renderer {
     // Everything in front of the belt (gun, projectiles and their tails, pops and hit sparks)
     // is drawn into memory and put on the canvas in one go: hundreds of small draw calls less.
     this.layer = new PixLayer();
+    this.fx = new WeaponFx(this); // what makes each weapon look like itself
   }
 
   // extra rows of sky above the playfield on tall screens
@@ -140,10 +142,12 @@ export class Renderer {
     this.hits.length = 0;
     this.rings.length = 0;
     this.parts.length = 0;
+    this.fx.reset();
   }
 
   // ---------------------------------------------------------------- events -> effects
   onEvent(e) {
+    this.fx.onEvent(e);
     if (e.type === 'hit') {
       const hits = this.hits;
       if (hits.length >= MAX_SPARKS) return;
@@ -254,6 +258,7 @@ export class Renderer {
   update(dt) {
     this.time += dt;
     this.bg.update(dt);
+    this.fx.update(dt);
     const step = dt * 0.6; // ~1.7 s cross-fade
     this.night += Math.max(-step, Math.min(step, this.nightTarget - this.night));
     for (const h of this.hits) h.t += dt;
@@ -307,7 +312,7 @@ export class Renderer {
     this.drawGun(gx, world.gun, world.emitters);
     this.drawProjectiles(world);
     if (world.goo.length) this.drawGoo(world.goo);
-    this.drawEffects();
+    this.drawEffects(world);
     this.layer.draw(g);
     g.setTransform(1, 0, 0, 1, 0, 0);
     this.g = main;
@@ -401,7 +406,7 @@ export class Renderer {
     for (const size of SIZE_ORDER) {
       for (const s of world.slimes) {
         if (s.size !== size) continue;
-        const sqi = clamp(Math.round(s.sq / 0.05) + 2, 0, 4);
+        const sqi = this.fx.squashOf(s, clamp(Math.round(s.sq / 0.05) + 2, 0, 4));
         const body = slimeBody(this.colorOf(s.type, size, s.kind), size, sqi, s.flash > 0);
         const mode = s.hurt > 0 ? 'hurt' : s.blink < 0 ? 'blink' : s.kind?.rage ? 'angry' : 'normal';
         if (s.kind?.ghost) g.globalAlpha = 0.18 + 0.62 * s.fade; // ghosts are see-through, and fade
@@ -416,6 +421,7 @@ export class Renderer {
           blitScaled(g, face, s.x, s.y, sc);
         }
         if (s.kind && sc > 0.02) this.drawKind(s, size, sqi, sc);
+        if (s.slowT > 0 || s.burn > 0) this.fx.drawOn(g, s); // frost, fire
         g.globalAlpha = 1;
       }
     }
@@ -459,7 +465,8 @@ export class Renderer {
       if (st.orient === 'dir') img = rotated(img, Math.atan2(p.vy, p.vx) + Math.PI / 2);
       else if (st.orient === 'spin') img = rotated(img, p.ang);
       if (name === 'flame3') { g.globalAlpha = 0.6; blit(g, img, p.x, p.y); g.globalAlpha = 1; }
-      else blit(g, img, p.x, p.y);
+      else if (!this.fx.drawProjectile(g, p, img)) blit(g, img, p.x, p.y);
+      this.fx.glint(g, p);
     }
   }
 
@@ -560,8 +567,9 @@ export class Renderer {
     }
   }
 
-  drawEffects() {
+  drawEffects(world) {
     const g = this.layer;
+    this.fx.draw(g, world.slimes);
     for (const r of this.rings) {
       const img = ring(r.r * (1 + r.t * 2.4), r.color);
       g.globalAlpha = 1 - r.t / RING_LIFE;

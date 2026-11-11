@@ -36,6 +36,9 @@ const CHILD_G0 = 0.55;
 const INTERMISSION = 2.2;        // pause between waves
 const FF_GAP = 0.35;             // empty field: next slime arrives after at most this
 const FADE_T = 0.25;             // ghosts fade out and in over this long
+const SLOW_T = 1.5;              // ice: a hit slime drifts slower for this long
+const BURN_T = 0.5;              // flames: burning damage fades in with this time constant (s)
+const ARC_R = 80;                // lightning: arcs to a slime within this distance
 const CELL = 24;
 const COLS = Math.ceil(W / CELL);
 
@@ -121,6 +124,7 @@ export class World {
     this.stamp = 0;
     this.topY = 0; // top edge of the visible sky, set by the game on tall screens
     this.nextId = 1;
+    this.projSeq = 0;   // numbers the projectiles (for looks that come every n-th shot)
     this.loadLevel(1, 18);
   }
 
@@ -194,7 +198,7 @@ export class World {
   escape(s) {
     s.dead = true;
     if (s === this.boss) this.boss = null;
-    this.ev('escape', { x: s.x, y: s.y, r: s.r, size: s.size, kind: s.type, k: s.kind.id, hearts: s.kind.hearts ?? 1 });
+    this.ev('escape', { id: s.id, x: s.x, y: s.y, r: s.r, size: s.size, kind: s.type, k: s.kind.id, hearts: s.kind.hearts ?? 1 });
   }
 
   // ---------------------------------------------------------------- gun
@@ -268,6 +272,7 @@ export class World {
     const x = this.gun.x + SLOT_OFFSETS[em.slot];
     this.spawnProj(st, 0, x, MUZZLE_Y, rad, v, -1, tint);
     this.gun.kick[em.slot] = 1;
+    this.ev('fire', { w: st.id, slot: em.slot, x, i });
   }
 
   // Projectiles fly in a straight line, always upwards. They only disappear when they
@@ -282,7 +287,7 @@ export class World {
       hits: s.hits, rest: 0,
       ang,
       spin: s.orient === 'spin' ? range(s.spin, rng) * rng.sign() : 0,
-      ignore, tint, age: 0, dist: 0, dead: false, lastHit: null,
+      ignore, tint, age: 0, dist: 0, dead: false, lastHit: null, k: this.projSeq++,
       trail: s.trail === 'bolt' ? [x, y] : null,
       spr: null, sprName: null, // sprite cache of the renderer
     };
@@ -408,8 +413,10 @@ export class World {
       s.vy += (s.tvy - s.vy) * steer;
       s.kx *= kdamp;
       s.ky *= kdamp;
-      s.x += (s.vx + s.kx) * dt;
-      s.y += (s.vy + s.ky) * dt;
+      const m = s.slowT > 0 ? 1 - s.slowF : 1; // frozen by ice: drifts slower
+      if (s.slowT > 0) s.slowT -= dt;
+      s.x += (s.vx * m + s.kx) * dt;
+      s.y += (s.vy * m + s.ky) * dt;
       if (s.x < minX(s)) { s.x = minX(s); s.kx = Math.abs(s.kx) * 0.5; if (s.tvx < 0) s.tvx = -s.tvx; }
       else if (s.x > maxX(s)) { s.x = maxX(s); s.kx = -Math.abs(s.kx) * 0.5; if (s.tvx > 0) s.tvx = -s.tvx; }
       if (s.y < this.topY + s.r + 4) { s.y = this.topY + s.r + 4; if (s.ky < 0) s.ky = 0; } // never pushed off the top
@@ -429,6 +436,7 @@ export class World {
       s.blink -= dt;
       if (s.blink < -0.12) s.blink = this.rng.range(1.5, 5);
       if (s.kind) this.kindStep(s, dt);
+      if (s.burn > 0) this.burnStep(s, dt);
     }
     this.pushApart(dt);
   }
@@ -500,7 +508,7 @@ export class World {
     const value = kind?.value ? s.maxHp * kind.value : s.maxHp;
     this.earned += value;
     if (s === this.boss) this.boss = null;
-    this.ev('pop', { x: s.x, y: s.y, r: s.r, size: s.size, kind: s.type, k: kind?.id, value });
+    this.ev('pop', { id: s.id, x: s.x, y: s.y, r: s.r, size: s.size, kind: s.type, k: kind?.id, value });
     if (s.size === 2) return;
     const rng = this.rng;
     const base = rng.next() * TAU;
@@ -520,14 +528,48 @@ export class World {
     }
   }
 
+  // A projectile's damage on a slime: ice slows it, part of a flame's damage burns off later.
+  strike(s, sl, dmg, hits) {
+    if (s.burn) { sl.burn = (sl.burn || 0) + dmg * s.burn; dmg *= 1 - s.burn; }
+    if (s.slow) { sl.slowT = SLOW_T; sl.slowF = s.slow; }
+    this.hurt(sl, dmg, hits);
+  }
+
+  // Burning: the damage left to burn comes off little by little (armour and softness do not
+  // stop fire), and may pop the slime.
+  burnStep(s, dt) {
+    let d = s.burn * (1 - Math.exp(-dt / BURN_T));
+    s.burn -= d;
+    if (s.burn < s.maxHp * 1e-4) { d += s.burn; s.burn = 0; }
+    this.hurt(s, d, 0);
+    if (!s.dead && s.hp <= 1e-9 * s.maxHp) this.killSlime(s);
+  }
+
+  // Lightning: part of the last bolt's damage arcs to the nearest other slime (to the one it
+  // hit, if there is none near).
+  arc(s, sl, x, y) {
+    let best = null, bd = ARC_R * ARC_R;
+    for (const o of this.slimes) {
+      if (o === sl || o.dead || o.ghost) continue;
+      const d = (o.x - x) ** 2 + (o.y - y) ** 2;
+      if (d < bd) { bd = d; best = o; }
+    }
+    const to = best ?? (sl && !sl.dead ? sl : null);
+    if (!to) return;
+    this.hurt(to, s.arc, 1);
+    this.ev('arc', { x0: x, y0: y, x1: to.x, y1: to.y });
+    if (to.hp <= 1e-9 * to.maxHp) this.killSlime(to);
+  }
+
   // Takes HP off a slime: whatever the armour, softness and bubble of a campaign kind let
-  // through. hits: how many hits the damage stands for (each meets the armour on its own).
+  // through. hits: how many hits the damage stands for (each meets the armour on its own; none
+  // for burning).
   hurt(sl, dmg, hits) {
     const k = sl.kind;
     if (k) {
       const base = sl.size === BOSS ? this.bigHp : sl.maxHp;
-      if (k.armor) dmg = Math.max(dmg - k.armor * base * hits * (k.plates ? (3 - sl.stage) / 3 : 1), dmg * ARMOR_KEEP);
-      if (k.cap) dmg = Math.min(dmg, k.cap * this.bigHp * hits); // the small ones are no softer
+      if (k.armor && hits) dmg = Math.max(dmg - k.armor * base * hits * (k.plates ? (3 - sl.stage) / 3 : 1), dmg * ARMOR_KEEP);
+      if (k.cap && hits) dmg = Math.min(dmg, k.cap * this.bigHp * hits); // the small ones are no softer
       if (k.rage) sl.wanderT = Math.min(sl.wanderT, 0.15); // off it goes, faster
       if (sl.shield > 0) {
         const soak = Math.min(sl.shield, dmg);
@@ -729,7 +771,7 @@ export class World {
     const s = p.s;
     const rng = this.rng;
     const dmg = p.hits === s.hits ? s.first : s.dmg;
-    this.hurt(sl, dmg, 1);
+    this.strike(s, sl, dmg, 1);
     const sp = Math.hypot(p.vx, p.vy) || 1;
     const k = s.recoil * (SLIME_R[0] / sl.r);
     sl.kx += (p.vx / sp) * k;
@@ -738,7 +780,7 @@ export class World {
     sl.sqv += 1.2 + Math.min(3, s.recoil * 0.08);
     if (sl.flashCd <= 0) { sl.flash = 0.035; sl.flashCd = 0.12; } // short white flash, not too often
     sl.hurt = 0.18;
-    this.ev('hit', { x: hx, y: hy });
+    this.ev('hit', { x: hx, y: hy, p, sl, last: p.hits === 1 }); // (p and sl: for the looks of some weapons)
     const killed = sl.hp <= 1e-9 * sl.maxHp;
     if (killed) this.killSlime(sl);
     p.hits--;
@@ -752,6 +794,7 @@ export class World {
       return;
     }
     if (p.hits <= 0) {
+      if (s.arc) this.arc(s, sl, hx, hy);
       if (s.split) this.split(p, hx, hy, sl.id);
       p.dead = true;
     }
@@ -764,13 +807,14 @@ export class World {
     if (into && (p.hits > 0 || family)) {
       const own = p.hits === p.s.hits ? p.s.total : p.s.dmg * p.hits;
       const extra = own + (family ? p.s.below : 0);
-      this.hurt(into, extra, Math.max(1, p.hits));
+      this.strike(p.s, into, extra, Math.max(1, p.hits));
       this.usedHits += p.hits;
       into.flash = 0.035;
       // show the hit on the slime's edge facing the projectile
       const dx = x - into.x, dy = y - into.y, d = Math.hypot(dx, dy) || 1, k = Math.min(1, (into.r * 0.85) / d);
-      this.ev('hit', { x: into.x + dx * k, y: into.y + dy * k });
+      this.ev('hit', { x: into.x + dx * k, y: into.y + dy * k, p, sl: into, last: true });
       if (into.hp <= 1e-9 * into.maxHp) this.killSlime(into);
+      if (p.s.arc) this.arc(p.s, into, x, y);
     }
     p.hits = 0;
     if (family) { if (p.s.split.fx) this.ev('split', { x, y, fx: p.s.split.fx }); }

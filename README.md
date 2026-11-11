@@ -17,6 +17,16 @@ gives all its remaining hits to the slime it is in, so no hits are wasted. The f
 projectile deals half of its damage, the later hits share the other half. Weapons are silent, only
 the slime hits and pops make sound.
 
+Every weapon has its own signature: the machine gun ejects brass casings and fires a tracer now and
+then, the shotgun blasts and smokes, water splashes, ninja stars glint and ricochet off, arrows and
+nails stay stuck until the slime pops, leaves flutter, daggers leave slash marks, popcorn goes
+POP!, plasma fizzes, bubbles wobble and burst, bombs leave shockwaves, smoke and debris, fireworks
+crackle, music notes make slimes bounce to the beat, rubber ducks squash on impact and meteors
+shower embers. Three of them also do something extra:
+- **Ice** frosts a slime and slows its drift for a moment.
+- **Flames** set it burning: part of the damage comes over the next second.
+- **Lightning**'s last bolt arcs to the nearest other slime.
+
 ## How to play
 
 - **Move**: touch where the gun should go (and drag), move the mouse, or use the arrow keys / A and D.
@@ -139,4 +149,5 @@ node tools/campaign.mjs --write  # fit the campaign's slime HP per level, write 
 | `js/ui.js` | HUD, banners, Armory |
 | `js/main.js` | Main loop, input, level flow |
 | `js/campaign.js`, `js/kinds.js`, `js/kind-art.js` | Campaign levels, slime kinds and their accessories |
+| `js/weapon-fx.js` | Each weapon's signature effects (casings, stuck arrows, slashes, frost, fire...) |
 | `js/offline.js`, `sw.js` | Offline play: the service worker keeps a copy of every file the game loads |
