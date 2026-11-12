@@ -18,8 +18,9 @@ const RENAMED = { prism: 'rainbow', splitter: 'grenade' };
 // the highest new one whose slimes are no stronger, so a save never lands on a level out of reach.
 const fromV4Level = (l) => 1 + Math.floor(((l - 1) * Math.log(2)) / Math.log(ECON.HP_GROWTH) + 1e-9);
 
-// The Zen progress sits at the top level of the save, the campaign's in `campaign`; both have
-// money, level, maxLevel, levels (weapon levels) and equipped. Since v6.
+// The Zen progress sits at the top level of the save, the campaign's in `campaign` and the test
+// lab's picks in `lab`; all have money, level, maxLevel, levels (weapon levels) and equipped.
+// Since v6.
 export function freshSave() {
   return {
     v: 6,
@@ -32,8 +33,9 @@ export function freshSave() {
     hinted: false,
     sky: 'auto',    // 'auto' (night 20:00-06:00 by the clock) | 'day' | 'night'
     kills: 0,
-    mode: 'zen',    // the mode played last: 'zen' | 'campaign'
+    mode: 'zen',    // the mode played last: 'zen' | 'campaign' | 'lab'
     campaign: freshCampaign(),
+    lab: freshLab(),
   };
 }
 
@@ -44,6 +46,21 @@ export function freshCampaign() {
     equipped: [0],
     stars: {},      // level -> best stars
     seen: [],       // slime kinds already introduced
+  };
+}
+
+// The test lab: every weapon, at any level; the slime it spawns and how.
+export function freshLab() {
+  return {
+    money: 0, level: 1, maxLevel: 1,
+    levels: WEAPONS.map(() => 1),
+    equipped: [0],
+    kind: 'blob',   // slime kind it spawns
+    size: 0,        // its size (bosses and swarms have their own)
+    count: 1,       // how many come per spawn
+    pop: 2,         // big slime HP: seconds the equipped weapons take to pop one
+    auto: false,    // keeps spawning on its own
+    speed: 1,       // game speed (slow motion below 1)
   };
 }
 
@@ -94,6 +111,11 @@ export function loadSave() {
       for (const key of ['money', 'level', 'maxLevel', 'stars', 'seen']) if (key in c) s.campaign[key] = c[key];
       weaponsFrom(s.campaign, c.weapons || {}, c.equippedIds || []);
     }
+    const l = d.lab;
+    if (l) {
+      for (const key of ['kind', 'size', 'count', 'pop', 'auto', 'speed']) if (key in l) s.lab[key] = l[key];
+      weaponsFrom(s.lab, { ...Object.fromEntries(WEAPONS.map((w) => [w.id, 1])), ...l.weapons }, l.equippedIds || []);
+    }
   } catch { /* corrupted or blocked storage: start fresh */ }
   return s;
 }
@@ -120,7 +142,7 @@ export function testAllSave() {
 }
 
 export function writeSave(s) {
-  const out = { ...weaponsTo(s), v: 6, campaign: weaponsTo(s.campaign) };
+  const out = { ...weaponsTo(s), v: 6, campaign: weaponsTo(s.campaign), lab: weaponsTo(s.lab) };
   try { localStorage.setItem(KEY, JSON.stringify(out)); } catch { /* storage unavailable */ }
 }
 

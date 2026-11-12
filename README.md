@@ -47,7 +47,7 @@ shower embers. Three of them also do something extra:
 
 Progress is saved in the browser (localStorage).
 
-### Two modes
+### Modes
 
 - **Zen**: the endless mode. One wave repeats; clear it to unlock the next level and farm any
   level you like.
@@ -56,31 +56,38 @@ Progress is saved in the browser (localStorage).
   every 10th level. You have 3 hearts: every slime that gets through costs one (a boss all three).
   Clearing pays a bonus and gives 1-3 stars for the hearts left. The campaign has its own money,
   weapons and upgrades. Settings > MAIN MENU switches modes.
-- Campaign slimes come in kinds, each with its own look and twist, introduced one by one:
+- Campaign slimes come in kinds, each with its own colour and twist, introduced one by one:
 
   | Kind | Twist |
   | --- | --- |
-  | Zippy (sweatband) | fast, but little HP |
+  | Zippy | fast, but little HP |
   | Golden | darts around; 10x coins, costs no heart |
   | Bubble | a soap bubble soaks up the first hits |
-  | Hopper (feet) | leaps aside now and then |
-  | Stone (cracks) | armour: every hit loses a bit, so big hits win |
-  | Mama (bow) | pops into five |
-  | Gloop (drips) | soft: one hit takes at most a little, so many small hits win |
-  | Grumpy (angry brows) | the more it is hurt, the faster it goes |
+  | Hopper | leaps aside now and then |
+  | Stone | armour: every hit loses a bit, so big hits win |
+  | Mama | pops into five |
+  | Gloop | soft: one hit takes at most a little, so many small hits win |
+  | Grumpy (angry face) | the more it is hurt, the faster it goes |
   | Ghost (see-through) | fades out now and then; shots pass through it then |
-  | Medic (nurse's cap) | heals the slimes around it |
-  | Spitter (puffed cheeks) | spits goo; goo on the gun jams a barrel for a moment |
-  | Swarm (bees) | clusters of tiny fast ones (a quarter heart each) |
-  | Sinker (kettlebell handle) | heavy: falls straight down, fast |
+  | Medic | heals the slimes around it |
+  | Spitter | spits goo; goo on the gun jams a barrel for a moment |
+  | Swarm | clusters of tiny fast ones (a quarter heart each) |
+  | Sinker | heavy: falls straight down, fast |
   | Prism (rainbow colours) | very rare: flies chaotic loops, 8x coins, flies off if you are too slow |
-  | Wiggler (oval, diamonds) | slithers down in an S-curve |
-  | Blinker (antenna) | blinks from place to place |
-  | Bomber (fuse) | popped, it blasts its neighbours down: pop it early |
-  | Sleepy (Zzz) | drifts very slowly while asleep; hit it and it rushes down |
+  | Wiggler (oval) | slithers down in an S-curve |
+  | Blinker | blinks from place to place |
+  | Bomber | popped, it blasts its neighbours down: pop it early |
+  | Sleepy (eyes closed) | drifts very slowly while asleep; hit it and it rushes down |
 
-- Bosses, in turn: King Blob (calls for help), Rock Golem (stone plates that break off), Phantom
+- Bosses, in turn: King Blob (calls for help), Rock Golem (armour that breaks off), Phantom
   (fades and reappears elsewhere), Gloop Mother (sheds Gloops), Spitter Tank (goo volleys).
+- **Test lab**: every weapon and every slime kind, for trying them out. On the SLIMES page pick a
+  kind, its size, how many come per spawn and AUTO (keeps sending more); on the WEAPONS page equip
+  up to three weapons and set their level with - / + (hold to go faster). POP TIME sets the HP: a
+  big slime takes your weapons that long to pop. Every weapon deals the same DPS here, so they
+  compare fairly. SPEED slows the game down to look closely. In the game the + button spawns the
+  slimes, the arrows switch the kind and the flask button opens the lab again. Slimes that get
+  through cost nothing. The lab keeps its own picks; Zen and campaign progress are not touched.
 
 ### Play offline / install as an app
 
@@ -154,6 +161,7 @@ node tools/campaign.mjs --write  # fit the campaign's slime HP per level, write 
 | `js/audio.js` | Synthesised sound effects (WebAudio) |
 | `js/ui.js` | HUD, banners, Armory |
 | `js/main.js` | Main loop, input, level flow |
-| `js/campaign.js`, `js/kinds.js`, `js/kind-art.js` | Campaign levels, slime kinds and their accessories |
+| `js/campaign.js`, `js/kinds.js`, `js/kind-art.js` | Campaign levels, slime kinds, the bubble and their warm-up |
+| `js/lab.js` | The test lab: any slime kind on demand, every weapon at any level |
 | `js/weapon-fx.js` | Each weapon's signature effects (casings, stuck arrows, slashes, frost, fire...) |
 | `js/offline.js`, `sw.js` | Offline play: the service worker keeps a copy of every file the game loads |

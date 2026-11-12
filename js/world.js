@@ -161,6 +161,13 @@ export class World {
     this.ev('waveStart', { n: 1, level });
   }
 
+  // Test lab: no waves and no script. Slimes come only when asked for (spawnFromScript), and
+  // the ones that reach the bottom splat there, as in the campaign.
+  loadLab(bigHp) {
+    this.loadLevel(1, bigHp, []);
+    this.waveState = 'lab';
+  }
+
   // stats: array of buildStats() results, one per equipped slot
   setLoadout(stats) {
     const old = this.emitters;
@@ -926,7 +933,7 @@ export class World {
   // ---------------------------------------------------------------- campaign levels
   // Like a wave, but played once from the level's script; then the level is cleared.
   updateScript(dt) {
-    if (this.waveState === 'done') return;
+    if (this.waveState !== 'run') return;
     const list = this.script;
     let fieldHp = 0;
     for (const s of this.slimes) fieldHp += s.hp;

@@ -21,6 +21,10 @@ const ICONS = {
   full: ['XXXX..XXXX', 'X........X', 'X........X', 'X........X', '..........', '..........', 'X........X',
     'X........X', 'X........X', 'XXXX..XXXX'],
   heart: ['.XX...XX.', 'XXXX.XXXX', 'XXXXXXXXX', 'XXXXXXXXX', '.XXXXXXX.', '..XXXXX..', '...XXX...', '....X....'],
+  flask: ['..XXXXXX..', '...X..X...', '...X..X...', '...X..X...', '..X....X..', '.X......X.', 'X.XXXXXX.X',
+    'XXXXXXXXXX', 'XXXXXXXXXX', '.XXXXXXXX.'],
+  plus: ['...XXXX...', '...XXXX...', '...XXXX...', 'XXXXXXXXXX', 'XXXXXXXXXX', 'XXXXXXXXXX', 'XXXXXXXXXX',
+    '...XXXX...', '...XXXX...', '...XXXX...'],
   cross: ['XX......XX', 'XXX....XXX', '.XXX..XXX.', '..XXXXXX..', '...XXXX...', '...XXXX...', '..XXXXXX..',
     '.XXX..XXX.', 'XXX....XXX', 'XX......XX'],
 };
@@ -30,7 +34,7 @@ function pixIcon(rows) {
   return `<svg viewBox="0 0 ${rows[0].length} ${rows.length}" shape-rendering="crispEdges" fill="currentColor">${rects}</svg>`;
 }
 
-function iconCanvas(def, silhouette) {
+export function iconCanvas(def, silhouette) {
   const st = def.stages[0];
   const name = Array.isArray(st.sprite) ? st.sprite[0] : st.sprite;
   const img = sprite(name, st.tints ? st.tints[0] : null);
@@ -73,8 +77,8 @@ export class UI {
     if (document.fullscreenEnabled) $('btnFull').addEventListener('click', () => { sfx('click'); game.toggleFullscreen(); });
     else $('btnFull').classList.add('hidden'); // e.g. iPhone: use "Add to Home Screen" instead
     this.shop.addEventListener('pointerdown', (e) => { if (e.target === this.shop) game.closeShop(); });
-    $('lvPrev').addEventListener('click', () => { sfx('click'); game.setLevel(game.prog.level - 1); });
-    $('lvNext').addEventListener('click', () => { sfx('click'); game.setLevel(game.prog.level + 1); });
+    $('lvPrev').addEventListener('click', () => { sfx('click'); game.stepLevel(-1); });
+    $('lvNext').addEventListener('click', () => { sfx('click'); game.stepLevel(1); });
     $('btnSettings').addEventListener('click', () => { sfx('click'); this.refreshSettings(); $('settings').classList.remove('hidden'); });
     $('settingsClose').addEventListener('click', () => { sfx('click'); $('settings').classList.add('hidden'); });
     $('btnReset').addEventListener('click', () => { sfx('click'); $('confirm').classList.remove('hidden'); });
@@ -88,6 +92,7 @@ export class UI {
     $('confirmYes').addEventListener('click', () => game.resetProgress());
     $('btnZen').addEventListener('click', () => game.start('zen'));
     $('btnCampaign').addEventListener('click', () => game.start('campaign'));
+    $('btnLab').addEventListener('click', () => game.start('lab'));
     $('btnMenu').addEventListener('click', () => { sfx('click'); game.toMenu(); });
     this.panel = $('panel');
     for (const b of this.panel.querySelectorAll('[data-act]')) b.addEventListener('click', () => game.panelAction(b.dataset.act));
@@ -142,7 +147,7 @@ export class UI {
       if (text !== this.moneyText) { this.moneyText = text; this.moneyEl.textContent = text; this.textT = 0; }
     }
     const w = this.game.world;
-    const wave = w.script ? `${w.spawnIdx}/${w.script.length}` : `WAVE ${w.waveNum}`;
+    const wave = this.game.inLab ? this.game.lab.sub : w.script ? `${w.spawnIdx}/${w.script.length}` : `WAVE ${w.waveNum}`;
     if (this.waveCache !== wave) { this.waveCache = wave; $('waveText').textContent = wave; }
     // the boss's HP bar (its width changes without laying out the page again)
     const boss = this.game.mode === 'play' ? w.boss : null;
@@ -165,8 +170,12 @@ export class UI {
 
   updateHud() {
     const s = this.game.prog;
-    const camp = this.game.inCampaign;
-    this.top.classList.toggle('hidden', !camp);
+    const camp = this.game.inCampaign, lab = this.game.inLab;
+    // the lab has a spawn button and its own panel instead of money and the shop, and no hearts
+    this.top.classList.toggle('hidden', !camp && !lab);
+    $('hearts').classList.toggle('hidden', lab);
+    for (const [id, on] of [['money', !lab], ['btnShop', !lab], ['btnSpawn', lab], ['btnLabPanel', lab]]) $(id).classList.toggle('hidden', !on);
+    if (lab) { this.game.lab.updateHud(); return; }
     if (camp) this.updateHearts(this.game.hearts);
     $('lvText').textContent = `LEVEL ${s.level}`;
     $('lvPrev').disabled = s.level <= 1;

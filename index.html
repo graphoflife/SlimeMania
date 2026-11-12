@@ -23,6 +23,7 @@
 
   <div id="hud" class="hidden">
     <div id="money" class="pill"><i class="coin"></i><span id="moneyVal">0</span></div>
+    <button id="btnSpawn" class="btn shopBtn spawnBtn hidden" aria-label="Spawn slimes"><i class="px" data-icon="plus"></i></button>
     <div id="levelBox">
       <button id="lvPrev" class="arrow" aria-label="Previous level"><i class="tri left"></i></button>
       <div id="lvLabel"><div id="lvText">LEVEL 1</div><div id="waveText">WAVE 1</div></div>
@@ -30,6 +31,7 @@
     </div>
     <div id="hudRight">
       <button id="btnShop" class="btn shopBtn" aria-label="Shop"><i class="px" data-icon="cart"></i></button>
+      <button id="btnLabPanel" class="btn shopBtn labBtn hidden" aria-label="Test lab"><i class="px" data-icon="flask"></i></button>
     </div>
   </div>
 
@@ -96,6 +98,45 @@
     </div>
   </div>
 
+  <!-- test lab: which slimes come, and every weapon at any level -->
+  <div id="lab" class="hidden">
+    <div class="shop-panel lab-panel">
+      <div class="shop-head">
+        <div class="shop-title">TEST LAB</div>
+        <div class="seg tabs"><button data-tab="slimes">SLIMES</button><button data-tab="weapons">WEAPONS</button></div>
+      </div>
+      <div class="lab-page" data-page="slimes">
+        <div class="lab-info">
+          <div class="li-head"><span id="labName"></span><span id="labMeta"></span></div>
+          <div id="labTip"></div>
+          <div id="labStats"></div>
+        </div>
+        <div class="lab-opts">
+          <div class="lab-row"><span>SIZE</span><div class="seg" id="labSize"></div></div>
+          <div class="lab-row"><span>COUNT</span><div class="seg" id="labCount"></div></div>
+          <div class="lab-row"><span>AUTO</span><div class="seg" id="labAuto"></div></div>
+        </div>
+        <div class="shop-list lab-kinds" id="labKinds"></div>
+      </div>
+      <div class="lab-page" data-page="weapons">
+        <div class="shop-sub"><span>EQUIPPED <b id="labEq">1/3</b></span><span>TAP A WEAPON TO EQUIP</span></div>
+        <div class="shop-list" id="labWeapons"></div>
+      </div>
+      <div class="shop-foot lab-foot">
+        <div class="lab-opts">
+          <div class="lab-row"><span>POP TIME</span><div class="seg" id="labPop"></div></div>
+          <div class="lab-row"><span>SPEED</span><div class="seg" id="labSpeed"></div></div>
+        </div>
+        <div class="shop-btns">
+          <button class="btn" data-lab="menu">MENU</button>
+          <button class="btn" data-lab="clear">CLEAR</button>
+          <button class="btn" data-lab="close">CLOSE</button>
+          <button class="btn go" data-lab="spawn">SPAWN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="title">
     <div class="logo" aria-label="SlimeMania">
       <span style="--c:#ff3a7c">S</span><span style="--c:#ff8c1a">L</span><span style="--c:#ffe23a">I</span><span style="--c:#7dff3a">M</span><span style="--c:#3ad7ff">E</span>
@@ -105,6 +146,7 @@
     <div class="modes">
       <button id="btnZen" class="btn mode"><span class="m-name">ZEN</span><span class="m-sub" id="zenSub">ENDLESS</span></button>
       <button id="btnCampaign" class="btn mode camp"><span class="m-name">CAMPAIGN</span><span class="m-sub" id="campSub">LEVEL 1</span></button>
+      <button id="btnLab" class="btn mode lab"><span class="m-name">TEST LAB</span><span class="m-sub">ALL WEAPONS AND SLIMES</span></button>
     </div>
     <div class="credits">30 WEAPONS · ENDLESS LEVELS · PURE POP</div>
   </div>

@@ -14,6 +14,7 @@ import { warmJobs, warmSlimes, warmProjectiles } from './sprites.js';
 import { warmKinds } from './kind-art.js';
 import { campaignLevel, clearBonus, levelKinds, HEARTS } from './campaign.js';
 import { KINDS } from './kinds.js';
+import { Lab } from './lab.js';
 import { keepScreenOn } from './wakelock.js';
 import { playOffline } from './offline.js';
 
@@ -54,6 +55,7 @@ class Game {
     this.saveT = 0;
     this.hudT = 0;
     this.ui = new UI(this);
+    this.lab = new Lab(this);
     // sprites are built ahead of time in idle moments, so nothing has to be built mid-fight
     this.warm = [{ kind: 'base', job: warmJobs() }, { kind: 'belt', job: this.renderer.warmBelt() }];
     setMuted(this.state.muted);
@@ -106,7 +108,7 @@ class Game {
 
   bindInput() {
     const el = this.root;
-    const playing = () => this.mode === 'play' && !this.ui.shopOpen;
+    const playing = () => this.mode === 'play' && !this.menuOpen;
     el.addEventListener('pointerdown', (e) => {
       if (!playing() || e.target.closest('button, #hud')) return;
       this.drag = { id: e.pointerId };
@@ -130,8 +132,8 @@ class Game {
       else if (k === 'arrowright' || k === 'd') this.keys.right = down;
       else if (down && (k === 'e' || k === 'tab') && this.mode === 'play') {
         e.preventDefault();
-        this.ui.shopOpen ? this.closeShop() : this.openShop();
-      } else if (down && k === 'escape' && this.ui.shopOpen) this.closeShop();
+        this.menuOpen ? this.closeShop() : this.openShop();
+      } else if (down && k === 'escape' && this.menuOpen) this.closeShop();
       else return;
       if (down && (k.startsWith('arrow') || k === 'a' || k === 'd')) this.moved();
     };
@@ -140,8 +142,11 @@ class Game {
   }
 
   // the progress of the mode being played (Zen's is the save itself)
-  get prog() { return this.state.mode === 'campaign' ? this.state.campaign : this.state; }
+  get prog() { return this.state.mode === 'campaign' ? this.state.campaign : this.state.mode === 'lab' ? this.state.lab : this.state; }
   get inCampaign() { return this.state.mode === 'campaign'; }
+  get inLab() { return this.state.mode === 'lab'; }
+  // the Armory or the lab's panel (the game waits while one is open)
+  get menuOpen() { return this.ui.shopOpen || this.lab.isOpen; }
 
   moved() {
     if (!this.state.hinted) {
@@ -181,6 +186,7 @@ class Game {
   toMenu() {
     writeSave(this.state);
     this.ui.closeShop();
+    this.lab.close();
     this.ui.showPanel(null);
     this.ui.showHud(false);
     this.mode = 'title';
@@ -201,7 +207,8 @@ class Game {
     this.queueWarm('slimes', warmSlimes(this.renderer.colors));
     this.renderer.reset();
     this.ui.showPanel(null);
-    if (this.inCampaign) this.startCampaignLevel(p);
+    if (this.inLab) { this.lv = null; this.lab.begin(); }
+    else if (this.inCampaign) this.startCampaignLevel(p);
     else {
       this.lv = null;
       this.world.loadLevel(p.level, slimeHp(p.level));
@@ -244,6 +251,12 @@ class Game {
     writeSave(this.state);
   }
 
+  // the HUD arrows: the level before or after (in the lab: the slime kind)
+  stepLevel(d) {
+    if (this.inLab) this.lab.cycle(d);
+    else this.setLevel(this.prog.level + d);
+  }
+
   setLevel(L) {
     const p = this.prog;
     if (L < 1 || L > p.maxLevel || (L === p.level && !this.ended)) return;
@@ -253,8 +266,9 @@ class Game {
 
   applyLoadout() {
     const s = this.prog;
-    const stats = s.equipped.map((i) => buildStats(WEAPONS[i], s.levels[i]));
+    const stats = s.equipped.map((i) => (this.inLab ? this.lab.stats(i) : buildStats(WEAPONS[i], s.levels[i])));
     this.world.setLoadout(stats);
+    if (this.inLab) this.world.bigHp = this.lab.bigHp(stats);
     this.queueWarm('weapons', warmProjectiles(stats));
   }
 
@@ -275,12 +289,12 @@ class Game {
         case 'pop':
           this.prog.money += e.value;
           this.state.kills++;
-          this.ui.addGain(e.value);
+          if (!this.inLab) this.ui.addGain(e.value);
           if (e.size === BOSS) sfx('pop0', 0.6);
           else sfx('pop' + e.size);
           if (e.size === 0 || e.size === BOSS) this.ui.bumpMoney();
           break;
-        case 'escape': this.onEscape(e); break;
+        case 'escape': if (this.inLab) sfx('deny'); else this.onEscape(e); break;
         case 'jam': sfx('deny'); break;
         case 'phase': sfx('pop0', 0.75); break;
         case 'blast': sfx('pop0', 0.65); break;
@@ -365,11 +379,13 @@ class Game {
   openShop() {
     if (this.mode !== 'play') return;
     this.drag = null;
-    this.ui.openShop();
+    if (this.inLab) this.lab.open();
+    else this.ui.openShop();
   }
 
   closeShop() {
     this.ui.closeShop();
+    this.lab.close();
     writeSave(this.state);
   }
 
@@ -418,7 +434,8 @@ class Game {
     } else this.equip(i);
     sfx('click');
     this.applyLoadout();
-    this.ui.refreshShop();
+    if (this.inLab) this.lab.refresh();
+    else this.ui.refreshShop();
   }
 
   setSound(on) {
@@ -443,23 +460,26 @@ class Game {
   loop(ts) {
     const dt = Math.min(0.1, (ts - this.last) / 1000 || 0);
     this.last = ts;
-    const paused = this.ui.shopOpen || document.hidden;
+    const paused = this.menuOpen || document.hidden;
+    const lab = this.inLab && this.mode === 'play';
+    const speed = lab ? this.lab.speed : 1; // slow motion in the lab
     let n = 0; // world steps this frame
     if (!paused) {
       if (this.keys.left !== this.keys.right) {
         const g = this.world.gun;
         g.targetX = clamp(g.x + (this.keys.left ? -60 : 60), GUN_MIN_X, GUN_MAX_X);
       }
-      this.acc += dt;
+      this.acc += dt * speed;
       while (this.acc >= STEP && n < 6) {
         if (this.mode === 'title' || this.autoplay) botUpdate(this.world, this.bot, STEP);
+        if (lab) this.lab.step(STEP);
         this.world.update(STEP);
         this.handleEvents();
         this.acc -= STEP;
         n++;
       }
       if (n === 6) this.acc = 0;
-      this.renderer.update(dt);
+      this.renderer.update(dt * speed);
       if (this.world.lost && this.mode === 'title') {
         this.world.loadLevel(1, slimeHp(1));
         this.renderer.reset();

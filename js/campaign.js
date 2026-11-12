@@ -9,7 +9,7 @@ import { CAMPAIGN_HP } from './campaign-table.js';
 export const WORLD_SIZE = 10;
 export const HEARTS = 3;
 const RARITY = { common: 60, uncommon: 24, rare: 9, veryRare: 2.5 };
-const BOSS_HP = [12, 25];  // boss HP in big slimes: mini boss, big boss
+export const BOSS_HP = [12, 25]; // boss HP in big slimes: mini boss, big boss
 const CLEAR_BONUS = 0.5;   // clearing pays this share of all the level's slimes are worth, x stars / 3
 
 // HP of a big slime on level n (tools/campaign.mjs fits the table; beyond it, the growth of its

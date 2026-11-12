@@ -1,6 +1,6 @@
-// Slime kinds of the campaign. Every kind is the same jelly slime with its own colours, a little
-// accessory and one twist in how it behaves. The world only looks at these fields for slimes
-// that have a kind: Zen slimes have none and behave exactly as always.
+// Slime kinds of the campaign. Every kind is the same jelly slime with its own colours (a few
+// with their own shape) and one twist in how it behaves. The world only looks at these fields
+// for slimes that have a kind: Zen slimes have none and behave exactly as always.
 //
 //   name, tip    shown when the kind first appears in the campaign
 //   from         first campaign level it can appear on

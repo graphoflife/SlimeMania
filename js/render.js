@@ -3,7 +3,7 @@ import {
   W, H, BOTTOM_BAR, CHAIN_Y, SPROCKET_R, SPROCKET_LX, SPROCKET_RX, MUZZLE_Y, LOSE_Y, SLOT_OFFSETS, BOSS,
 } from './config.js';
 import { KINDS } from './kinds.js';
-import { kindOverlays, bubbleSprite } from './kind-art.js';
+import { bubbleSprite } from './kind-art.js';
 import { WeaponFx } from './weapon-fx.js';
 import { Background } from './background.js';
 import {
@@ -431,20 +431,16 @@ export class Renderer {
           blitScaled(g, body, s.x, s.y, sc);
           blitScaled(g, face, s.x, s.y, sc);
         }
-        if (s.kind && sc > 0.02) this.drawKind(s, size, sqi, sc);
+        if (s.kind && sc > 0.02) this.drawKind(s, size, sc);
         if (s.slowT > 0 || s.burn > 0) this.fx.drawOn(g, s); // frost, fire
         g.globalAlpha = 1;
       }
     }
   }
 
-  // what a campaign kind wears or carries on top of its body
-  drawKind(s, size, sqi, sc) {
+  // what is drawn on top of a campaign kind's body: its bubble, speed lines, twinkles
+  drawKind(s, size, sc) {
     const g = this.g, k = s.kind;
-    for (const over of kindOverlays(s, size, sqi)) {
-      if (!over) continue; // e.g. a golem without plates left
-      if (sc === 1) blit(g, over, s.x, s.y); else blitScaled(g, over, s.x, s.y, sc);
-    }
     if (s.shield > 0) { const b = bubbleSprite(size); if (sc === 1) blit(g, b, s.x, s.y); else blitScaled(g, b, s.x, s.y, sc); }
     if (k.straight && sc === 1) {
       // sinker: speed lines above it
@@ -452,14 +448,6 @@ export class Renderer {
       g.globalAlpha = 0.55;
       for (const dx of [-0.45, 0, 0.45]) g.fillRect(Math.round(s.x + dx * s.r), Math.round(s.y - s.r - 4 - Math.abs(dx) * 6), 1, 5);
       g.globalAlpha = 1;
-    }
-    if (k.blast) {
-      // bomber: the fuse sparks
-      const x = Math.round(s.x + s.r * 0.4), y = Math.round(s.y - s.r * 1.1 - 2), on = Math.floor(this.time * 20 + s.id) % 2;
-      g.fillStyle = on ? '#ffffff' : '#ffe23a';
-      g.fillRect(x - 1, y, 3, 1);
-      g.fillRect(x, y - 1, 1, 3);
-      if (on) { g.fillStyle = '#ff8c1a'; g.fillRect(x + 1, y - 2, 1, 1); g.fillRect(x - 2, y + 1, 1, 1); }
     }
     if (k.zigzag || k.loop) {
       // golden and prism: a twinkle here and there around it

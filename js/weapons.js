@@ -275,7 +275,7 @@ export const WEAPONS = [
 
 // Balance factors (nominal DPS multiplier) come from tools/balance.mjs, measured at a few
 // weapon levels up to 31 (after that the pulse stops shrinking); log-interpolated in between.
-function balance(id, level) {
+export function balance(id, level) {
   const b = BALANCE[id];
   if (!b) return 1;
   const L = BALANCE_LEVELS;
