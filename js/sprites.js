@@ -97,19 +97,20 @@ export const SQUASH = [-0.1, -0.05, 0, 0.05, 0.1];
 export const OUTLINE = 3; // comic outline, the same for every slime size
 const bodyCache = new Map(); // colour -> [size * 10 + sqi * 2 + flash]
 
-// size: 0..2, sqi: index into SQUASH, flash: white silhouette
-export function slimeBody(color, size, sqi, flash) {
-  let arr = bodyCache.get(color);
-  if (!arr) bodyCache.set(color, (arr = []));
+// size: 0..3, sqi: index into SQUASH, flash: white silhouette, aspect: an oval this much wider
+export function slimeBody(color, size, sqi, flash, aspect = 1) {
+  const key = aspect === 1 ? color : color + '@' + aspect;
+  let arr = bodyCache.get(key);
+  if (!arr) bodyCache.set(key, (arr = []));
   const k = size * 10 + sqi * 2 + (flash ? 1 : 0);
-  return arr[k] || (arr[k] = buildBody(color, size, sqi, flash));
+  return arr[k] || (arr[k] = buildBody(color, size, sqi, flash, aspect));
 }
 
-function buildBody(color, size, sqi, flash) {
+function buildBody(color, size, sqi, flash, aspect) {
   const r = SLIME_R[size];
   const sq = SQUASH[sqi];
-  const rx = r * (1 + sq), ry = r / (1 + sq);
-  const dim = Math.ceil(r * 1.15) * 2 + 2;
+  const rx = r * (1 + sq) * aspect, ry = r / (1 + sq) / aspect;
+  const dim = Math.ceil(r * 1.15 * aspect) * 2 + 2;
   const b = new PixBuf(dim, dim);
   const cx = dim / 2, cy = dim / 2;
   const ol = OUTLINE;

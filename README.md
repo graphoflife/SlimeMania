@@ -72,6 +72,12 @@ Progress is saved in the browser (localStorage).
   | Medic (nurse's cap) | heals the slimes around it |
   | Spitter (puffed cheeks) | spits goo; goo on the gun jams a barrel for a moment |
   | Swarm (bees) | clusters of tiny fast ones (a quarter heart each) |
+  | Sinker (kettlebell handle) | heavy: falls straight down, fast |
+  | Prism (rainbow colours) | very rare: flies chaotic loops, 8x coins, flies off if you are too slow |
+  | Wiggler (oval, diamonds) | slithers down in an S-curve |
+  | Blinker (antenna) | blinks from place to place |
+  | Bomber (fuse) | popped, it blasts its neighbours down: pop it early |
+  | Sleepy (Zzz) | drifts very slowly while asleep; hit it and it rushes down |
 
 - Bosses, in turn: King Blob (calls for help), Rock Golem (stone plates that break off), Phantom
   (fades and reappears elsewhere), Gloop Mother (sheds Gloops), Spitter Tank (goo volleys).

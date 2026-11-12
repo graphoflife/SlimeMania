@@ -365,6 +365,13 @@ export class World {
       s.healT = kind.heal ? rng.range(0.3, kind.heal.every) : 0;
       s.spitT = kind.spit ? range(kind.spit.every, rng) * 0.6 : 0;
       s.stage = 0; // boss phases passed (75 / 50 / 25 % HP)
+      s.loopA = rng.range(0, TAU);  // prism: heading and how fast it turns
+      s.loopW = 0;
+      s.loopT = 0;
+      s.fleeing = false;
+      s.snakeP = rng.range(0, TAU); // wiggler: where in its curve it is
+      s.blinkT = kind.blink ? range(kind.blink.every, rng) : 0;
+      s.asleep = !!kind.sleepy;
     }
     this.wander(s);
     s.vx = s.tvx;
@@ -390,10 +397,12 @@ export class World {
     else { ang = DOWN + rng.range(-0.8, 0.8); spd = rng.range(1, 4); }                               // dawdle
     const k = s.kind;
     if (k?.zigzag) { ang = DOWN + rng.sign() * rng.range(0.9, 1.35); spd = rng.range(22, 34); }  // dart from side to side
+    if (k?.straight || k?.snake) { ang = DOWN + rng.range(-0.06, 0.06); spd = rng.range(10, 13); }  // straight down (a wiggler's curve comes on top)
     if ((s.x < minX(s) + 10 && Math.cos(ang) < 0) || (s.x > maxX(s) - 10 && Math.cos(ang) > 0)) ang = Math.PI - ang;
     spd *= SPEED_MUL[s.size] * ((BASE_PATH - this.topY) / BASE_PATH);
     if (k?.speed) spd *= k.speed;
     if (k?.rage) spd *= 1 + k.rage * (1 - s.hp / s.maxHp);
+    if (k?.sleepy) spd *= s.asleep ? 0.35 : k.sleepy;
     s.tvx = Math.cos(ang) * spd;
     s.tvy = Math.sin(ang) * spd;
     s.faceTarget = ang + rng.range(-0.45, 0.45);
@@ -419,7 +428,7 @@ export class World {
       s.y += (s.vy * m + s.ky) * dt;
       if (s.x < minX(s)) { s.x = minX(s); s.kx = Math.abs(s.kx) * 0.5; if (s.tvx < 0) s.tvx = -s.tvx; }
       else if (s.x > maxX(s)) { s.x = maxX(s); s.kx = -Math.abs(s.kx) * 0.5; if (s.tvx > 0) s.tvx = -s.tvx; }
-      if (s.y < this.topY + s.r + 4) { s.y = this.topY + s.r + 4; if (s.ky < 0) s.ky = 0; } // never pushed off the top
+      if (s.y < this.topY + s.r + 4 && !s.fleeing) { s.y = this.topY + s.r + 4; if (s.ky < 0) s.ky = 0; } // never pushed off the top
       // facing: follows the travel direction, but never looks too far off
       s.heading = Math.atan2(s.vy, s.vx);
       s.face += angDiff(s.faceTarget, s.face) * faceK;
@@ -498,7 +507,7 @@ export class World {
       s.y += s.py * dt;
       if (s.x < minX(s)) { s.x = minX(s); if (s.px < 0) s.px = 0; }
       else if (s.x > maxX(s)) { s.x = maxX(s); if (s.px > 0) s.px = 0; }
-      if (s.y < this.topY + s.r + 4) { s.y = this.topY + s.r + 4; if (s.py < 0) s.py = 0; }
+      if (s.y < this.topY + s.r + 4 && !s.fleeing) { s.y = this.topY + s.r + 4; if (s.py < 0) s.py = 0; }
     }
   }
 
@@ -509,6 +518,7 @@ export class World {
     this.earned += value;
     if (s === this.boss) this.boss = null;
     this.ev('pop', { id: s.id, x: s.x, y: s.y, r: s.r, size: s.size, kind: s.type, k: kind?.id, value });
+    if (kind?.blast) this.blast(s);
     if (s.size === 2) return;
     const rng = this.rng;
     const base = rng.next() * TAU;
@@ -524,6 +534,7 @@ export class World {
       c.g0 = CHILD_G0;
       c.growT = CHILD_GROW_T;
       c.sqv = 2.5;
+      if (ck?.sleepy) { c.asleep = false; c.wanderT = 0.05; } // woken up by now
       this.pending.push(c);
     }
   }
@@ -571,6 +582,7 @@ export class World {
       if (k.armor && hits) dmg = Math.max(dmg - k.armor * base * hits * (k.plates ? (3 - sl.stage) / 3 : 1), dmg * ARMOR_KEEP);
       if (k.cap && hits) dmg = Math.min(dmg, k.cap * this.bigHp * hits); // the small ones are no softer
       if (k.rage) sl.wanderT = Math.min(sl.wanderT, 0.15); // off it goes, faster
+      if (sl.asleep) { sl.asleep = false; sl.wanderT = 0.05; this.ev('wake', { x: sl.x, y: sl.y - sl.r }); }
       if (sl.shield > 0) {
         const soak = Math.min(sl.shield, dmg);
         sl.shield -= soak;
@@ -602,6 +614,22 @@ export class World {
       } else if (before > 0.3 && s.hopT <= 0.3) s.sqv = 2.5; // crouch first
     }
     if (k.ghost) this.ghostStep(s, dt);
+    if (k.loop) this.loopStep(s, dt);
+    if (k.snake) {
+      // the S-curve: its sideways drift follows a sine
+      const sn = k.snake, w = TAU / sn.period;
+      s.snakeP += w * dt;
+      s.vx = s.tvx = sn.amp * w * Math.cos(s.snakeP);
+    }
+    if (k.blink && (s.blinkT -= dt) <= 0) {
+      // gone, and back a little to the side
+      s.blinkT = range(k.blink.every, rng);
+      const d = range(k.blink.dist, rng), room = s.x - minX(s) < maxX(s) - s.x ? 1 : -1;
+      this.ev('teleport', { x: s.x, y: s.y, r: s.r });
+      s.x = clamp(s.x + (rng.next() < 0.7 ? room : -room) * d, minX(s), maxX(s));
+      s.flash = 0.06;
+      this.ev('teleport', { x: s.x, y: s.y, r: s.r });
+    }
     if (k.heal && (s.healT -= dt) <= 0) this.heal(s);
     if (k.spit && (s.spitT -= dt) <= 0) this.spit(s);
     if (k.plates || k.shed) {
@@ -611,6 +639,37 @@ export class World {
         this.ev('phase', { x: s.x, y: s.y, r: s.r, k: k.id });
       }
     }
+  }
+
+  // A prism flies loops, turning one way and then the other, up as well as down; never too low.
+  // After a while it flies off the top (and takes its coins with it).
+  loopStep(s, dt) {
+    const lp = s.kind.loop, rng = this.rng;
+    if (!s.fleeing && s.age > lp.flee) s.fleeing = true;
+    if ((s.loopT -= dt) <= 0) {
+      s.loopT = rng.range(0.5, 1.3);
+      s.loopW = rng.sign() * rng.range(2.5, 5.5);
+    }
+    s.loopA += s.loopW * dt;
+    if (s.fleeing || s.y + s.r > LOSE_Y - 70) s.loopA += angDiff(UP, s.loopA) * Math.min(1, 6 * dt); // head up
+    const v = lp.speed * (s.fleeing ? 1.6 : 1);
+    s.vx = s.tvx = Math.cos(s.loopA) * v;
+    s.vy = s.tvy = Math.sin(s.loopA) * v + (s.fleeing ? 0 : lp.drift); // the loops drift down
+    if (s.fleeing && s.y < this.topY - s.r) { s.dead = true; this.ev('flee', { x: s.x, y: this.topY + 4 }); }
+  }
+
+  // Bomber: when it pops, the slimes around it are blown down and apart.
+  blast(s) {
+    const b = s.kind.blast, k = s.r / SLIME_R[0], R = b.r * (0.5 + 0.5 * k);
+    for (const o of this.slimes) {
+      if (o === s || o.dead) continue;
+      const dx = o.x - s.x, dy = o.y - s.y, d = Math.hypot(dx, dy);
+      if (d > R + o.r) continue;
+      const f = b.push * k * (1 - d / (R + o.r) * 0.5) * (SLIME_R[0] / o.r) ** 0.5;
+      o.kx += (dx / (d || 1)) * f * 0.5;
+      o.ky += f; // mostly down
+    }
+    this.ev('blast', { x: s.x, y: s.y, r: R });
   }
 
   // Ghosts are there for a while, then fade out; shots pass through them while they are faded.

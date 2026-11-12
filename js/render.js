@@ -183,6 +183,15 @@ export class Renderer {
       // a boss loses a plate (rocks fly) or sheds its young (a gooey ring)
       if (e.k === 'golem') { this.sparkle(e.x, e.y, 22, ['#a3a9ba', '#5d6376', '#2a2d38'], 60, 150); this.shake = Math.max(this.shake, 2); }
       else this.rings.push({ x: e.x, y: e.y, r: e.r * 0.8, t: 0, color: '#9aeb7a' });
+    } else if (e.type === 'blast') {
+      // a bomber goes off
+      this.hits.push({ x: e.x, y: e.y, t: 0, rot: Math.random() * TAU, sc: 2.6 * e.r / 72 + 0.8 });
+      this.rings.push({ x: e.x, y: e.y, r: e.r * 0.5, t: 0, color: '#fff3c0' });
+      this.shake = Math.max(this.shake, 2.2);
+    } else if (e.type === 'wake') {
+      this.sparkle(e.x, e.y, 8, ['#ffffff', '#ffe23a'], 30, 70);
+    } else if (e.type === 'flee') {
+      this.sparkle(e.x, e.y, 16, ['#ff3a5c', '#ffe21a', '#5ae05a', '#2fb4ff', '#ffffff'], 40, 110);
     } else if (e.type === 'teleport') {
       this.rings.push({ x: e.x, y: e.y, r: e.r * 0.7, t: 0, color: '#e2dcff' });
     } else if (e.type === 'levelClear') {
@@ -209,8 +218,10 @@ export class Renderer {
     }
   }
 
-  // a slime's colour: its kind's own, or the level's for its type
-  colorOf(type, size, kind) {
+  // a slime's colour: its kind's own (a prism's cycles through the rainbow), or the level's for
+  // its type
+  colorOf(type, size, kind, id = 0) {
+    if (kind?.rainbow) return kind.rainbow[(Math.floor(this.time * 8) + id) % kind.rainbow.length];
     const c = kind?.colors ?? this.colors[type];
     return c[size === BOSS ? 0 : size];
   }
@@ -407,8 +418,8 @@ export class Renderer {
       for (const s of world.slimes) {
         if (s.size !== size) continue;
         const sqi = this.fx.squashOf(s, clamp(Math.round(s.sq / 0.05) + 2, 0, 4));
-        const body = slimeBody(this.colorOf(s.type, size, s.kind), size, sqi, s.flash > 0);
-        const mode = s.hurt > 0 ? 'hurt' : s.blink < 0 ? 'blink' : s.kind?.rage ? 'angry' : 'normal';
+        const body = slimeBody(this.colorOf(s.type, size, s.kind, s.id), size, sqi, s.flash > 0, s.kind?.aspect ?? 1);
+        const mode = s.hurt > 0 ? 'hurt' : s.blink < 0 || s.asleep ? 'blink' : s.kind?.rage ? 'angry' : 'normal';
         if (s.kind?.ghost) g.globalAlpha = 0.18 + 0.62 * s.fade; // ghosts are see-through, and fade
         const face = rotated(slimeFace(size, mode), s.face + s.kick - Math.PI / 2);
         const sc = slimeScale(s);
@@ -435,8 +446,23 @@ export class Renderer {
       if (sc === 1) blit(g, over, s.x, s.y); else blitScaled(g, over, s.x, s.y, sc);
     }
     if (s.shield > 0) { const b = bubbleSprite(size); if (sc === 1) blit(g, b, s.x, s.y); else blitScaled(g, b, s.x, s.y, sc); }
-    if (k.zigzag) {
-      // golden: a twinkle here and there around it
+    if (k.straight && sc === 1) {
+      // sinker: speed lines above it
+      g.fillStyle = '#ffffff';
+      g.globalAlpha = 0.55;
+      for (const dx of [-0.45, 0, 0.45]) g.fillRect(Math.round(s.x + dx * s.r), Math.round(s.y - s.r - 4 - Math.abs(dx) * 6), 1, 5);
+      g.globalAlpha = 1;
+    }
+    if (k.blast) {
+      // bomber: the fuse sparks
+      const x = Math.round(s.x + s.r * 0.4), y = Math.round(s.y - s.r * 1.1 - 2), on = Math.floor(this.time * 20 + s.id) % 2;
+      g.fillStyle = on ? '#ffffff' : '#ffe23a';
+      g.fillRect(x - 1, y, 3, 1);
+      g.fillRect(x, y - 1, 1, 3);
+      if (on) { g.fillStyle = '#ff8c1a'; g.fillRect(x + 1, y - 2, 1, 1); g.fillRect(x - 2, y + 1, 1, 1); }
+    }
+    if (k.zigzag || k.loop) {
+      // golden and prism: a twinkle here and there around it
       const t = Math.floor(this.time * 9), a = ((s.id * 2.3 + t * 1.7) % 6.283), d = s.r * (0.6 + ((t * 7 + s.id) % 5) / 10);
       const x = Math.round(s.x + Math.cos(a) * d), y = Math.round(s.y + Math.sin(a) * d);
       g.fillStyle = t % 2 ? '#ffffff' : '#fff7b0';

@@ -283,6 +283,7 @@ class Game {
         case 'escape': this.onEscape(e); break;
         case 'jam': sfx('deny'); break;
         case 'phase': sfx('pop0', 0.75); break;
+        case 'blast': sfx('pop0', 0.65); break;
         case 'levelClear': this.onClear(); break;
         case 'spawn': if (e.boss) this.ui.showBanner('BOSS!', KINDS[e.k].name, '#ff3a7c', 1.8); break;
         case 'waveStart': if (e.n > 1) this.ui.showBanner(`WAVE ${e.n}`, '', '#ffffff', 1.2, true); break;

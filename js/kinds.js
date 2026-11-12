@@ -23,6 +23,15 @@
 //   heal         { every, range, amount }: heals slimes near it by a fraction of their HP
 //   spit         { every: [s, s], n, aim }: spits goo at the gun; goo on the gun jams a barrel
 //   swarm        n: comes as a cluster of n small slimes
+//   straight     only ever drifts straight down
+//   loop         { speed, drift, flee }: flies chaotic loops (up as well as down) at this speed,
+//                drifting down at `drift` px/s, and flies off the top after `flee` seconds
+//   rainbow      colours it cycles through (instead of `colors`)
+//   snake        { amp, period }: slithers down in an S-curve, amp px to each side
+//   aspect       its body is an oval this much wider than tall
+//   blink        { every: [s, s], dist: [px, px] }: now and then it vanishes and reappears aside
+//   blast        { r, push }: when it pops, slimes within r px are blown down (and apart)
+//   sleepy       drifts very slowly while asleep; once hit it wakes up and hurries (x this speed)
 //   boss         size 3, with an HP bar
 //   summon       { every: s, n, kind }: drops slimes from below itself now and then
 //   plates       (boss) its armour is in 3 plates that break off at 75 / 50 / 25 % HP
@@ -78,6 +87,31 @@ export const KINDS = {
   spitter: {
     name: 'SPITTER', tip: 'DODGE THE GOO OR A BARREL JAMS', from: 19, rarity: 'rare',
     colors: ['#9dff1a', '#b8ff5a', '#d0ff8a'], spit: { every: [2.5, 4], n: 1, aim: false },
+  },
+  sinker: {
+    name: 'SINKER', tip: 'HEAVY: IT FALLS FAST', from: 7, rarity: 'uncommon',
+    colors: ['#3a4ab8', '#4a5ac8', '#6a7ad8'], hp: 0.8, speed: 2.2, straight: true,
+  },
+  prism: {
+    name: 'PRISM SLIME', tip: 'CATCH IT BEFORE IT FLIES OFF: 8X COINS', from: 9, rarity: 'veryRare',
+    rainbow: ['#ff3a5c', '#ff8c1a', '#ffe21a', '#5ae05a', '#2fb4ff', '#9a5aff'], colors: ['#ff3a5c', '#ff3a5c', '#ff3a5c'],
+    hp: 0.7, value: 8, hearts: 0, loop: { speed: 55, drift: 22, flee: 11 },
+  },
+  wiggler: {
+    name: 'WIGGLER', tip: 'IT SLITHERS DOWN IN CURVES', from: 11, rarity: 'uncommon',
+    colors: ['#9dcc1a', '#b4dc3a', '#c8ea6a'], aspect: 1.28, snake: { amp: 34, period: 2.6 },
+  },
+  blinker: {
+    name: 'BLINKER', tip: 'IT BLINKS FROM PLACE TO PLACE', from: 16, rarity: 'uncommon',
+    colors: ['#d22eff', '#e05aff', '#ea8aff'], blink: { every: [2.2, 3.4], dist: [40, 70] },
+  },
+  bomber: {
+    name: 'BOMBER', tip: 'POPPED, IT BLASTS ITS FRIENDS DOWN', from: 18, rarity: 'uncommon',
+    colors: ['#3a3a4a', '#4a4a5c', '#5c5c70'], blast: { r: 72, push: 150 },
+  },
+  sleepy: {
+    name: 'SLEEPY', tip: 'WAKE IT AND IT RUSHES DOWN', from: 20, rarity: 'uncommon',
+    colors: ['#7a8cff', '#9aa6ff', '#b8c0ff'], hp: 1.2, sleepy: 2.4,
   },
   swarm: {
     name: 'SWARM', tip: 'TINY, FAST AND MANY', from: 22, rarity: 'common',

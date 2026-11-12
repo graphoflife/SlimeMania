@@ -16,10 +16,10 @@ const cached = (key, build) => {
 
 // The body's frame: canvas size (the body's plus room around it), its centre, the radii, the
 // ellipse inside the comic outline and the body's lower edge.
-function frame(size, sqi) {
+function frame(size, sqi, aspect = 1) {
   const r = SLIME_R[size], sq = SQUASH[sqi];
-  const rx = r * (1 + sq), ry = r / (1 + sq);
-  const dim = (Math.ceil(r * 1.15) + Math.ceil(r * 0.5)) * 2 + 2; // the body's canvas, plus room
+  const rx = r * (1 + sq) * aspect, ry = r / (1 + sq) / aspect;
+  const dim = (Math.ceil(r * 1.15 * aspect) + Math.ceil(r * 0.5)) * 2 + 2; // the body's canvas, plus room
   const c = dim / 2, ol = OUTLINE;
   const inner = (x, y) => ((x + 0.5 - c) / (rx - ol)) ** 2 + ((y + 0.5 - c) / (ry - ol)) ** 2 <= 1;
   const bottom = (x) => c + ry * Math.sqrt(Math.max(0, 1 - ((x - c) / rx) ** 2)); // lower edge at x
@@ -236,6 +236,51 @@ function hat(size, sqi) {
   return crop(f);
 }
 
+// Sinker: the handle of a kettlebell on top. Heavy!
+function handle(size, sqi) {
+  const f = frame(size, sqi), r = f.r, cx = f.c, cy = f.c - f.ry + r * 0.12, R = r * 0.3, t = Math.max(1.2, r * 0.09);
+  shape(f.b, (x, y) => y < cy + 1 && Math.abs(Math.hypot(x - cx, y - cy) - R) <= t, (x, y) => (x < cx - R * 0.3 && y < cy - R * 0.5 ? '#e0e6f0' : '#8f99ab'));
+  return crop(f);
+}
+
+// Wiggler: dark diamonds along its oval body, like a snake's back.
+function diamonds(size, sqi, aspect) {
+  const f = frame(size, sqi, aspect), s = f.r * 0.13;
+  for (let k = -2; k <= 2; k++) {
+    const x = f.c + k * f.rx * 0.33, y = f.c - f.ry * 0.38;
+    shape(f.b, (px, py) => f.inner(px, py) && Math.abs(px - x) / (s * 1.3) + Math.abs(py - y) / s <= 1, '#4a7a10', null);
+  }
+  return crop(f);
+}
+
+// Blinker: an antenna with a glowing ball.
+function antenna(size, sqi) {
+  const f = frame(size, sqi), r = f.r, x = f.c + r * 0.12, y0 = f.c - f.ry + 1, y1 = y0 - r * 0.42;
+  shape(f.b, (px, py) => inSeg(x, y0, x + r * 0.08, y1, Math.max(0.6, r * 0.04))(px, py) || inEllipse(x + r * 0.08, y1, r * 0.13, r * 0.13)(px, py),
+    (px, py) => (py < y1 + r * 0.14 ? (px < x + r * 0.05 ? '#fff7b0' : '#ffe23a') : '#2a2a38'));
+  return crop(f);
+}
+
+// Bomber: a fuse coming out of the top (its spark is drawn live).
+function fuse(size, sqi) {
+  const f = frame(size, sqi), r = f.r, x0 = f.c + r * 0.1, y0 = f.c - f.ry + 2;
+  const a = inSeg(x0, y0, x0 + r * 0.12, y0 - r * 0.22, Math.max(0.7, r * 0.05)), b = inSeg(x0 + r * 0.12, y0 - r * 0.22, x0 + r * 0.3, y0 - r * 0.32, Math.max(0.7, r * 0.05));
+  shape(f.b, (px, py) => a(px, py) || b(px, py), '#c8a070');
+  shape(f.b, inEllipse(x0, y0 + 1, r * 0.16, r * 0.08), '#5c5c70'); // its cap
+  return crop(f);
+}
+
+// Sleepy: a "z z" while it sleeps.
+function zzz(size, sqi) {
+  const f = frame(size, sqi), k = size === 0 ? 2 : 1;
+  const Z = ['XXXX', '..X.', '.X..', 'XXXX'];
+  for (const [ox, oy, kk] of [[0.45, -0.95, k], [0.75, -1.25, Math.max(1, k - 1)]]) {
+    const x0 = Math.round(f.c + f.rx * ox), y0 = Math.round(f.c + f.ry * oy);
+    shape(f.b, (x, y) => Z[Math.floor((y - y0) / kk)]?.[Math.floor((x - x0) / kk)] === 'X', '#ffffff');
+  }
+  return crop(f);
+}
+
 // Spitter tank: a riveted iron helmet, and the cheeks of course.
 function helmet(size, sqi) {
   const f = frame(size, sqi), r = f.r, cy = f.c - f.ry + r * 0.32;
@@ -265,6 +310,11 @@ export function kindOverlays(s, size, sqi) {
     case 'king': return [cached(`crown${size}${sqi}`, () => crown(size, sqi))];
     case 'golem': { const st = stageOf(s); return [cached(`plates${size}${sqi}${st}`, () => plates(size, sqi, st)), cached(`crack${size}${sqi}${st}`, () => cracks(size, sqi, st))]; }
     case 'spitTank': return [cached(`helmet${size}${sqi}`, () => helmet(size, sqi))];
+    case 'sinker': return [cached(`handle${size}${sqi}`, () => handle(size, sqi))];
+    case 'wiggler': return [cached(`diamonds${size}${sqi}`, () => diamonds(size, sqi, k.aspect))];
+    case 'blinker': return [cached(`antenna${size}${sqi}`, () => antenna(size, sqi))];
+    case 'bomber': return [cached(`fuse${size}${sqi}`, () => fuse(size, sqi))];
+    case 'sleepy': return s.asleep ? [cached(`zzz${size}${sqi}`, () => zzz(size, sqi))] : NONE;
     default: return NONE;
   }
 }
@@ -292,10 +342,10 @@ export function* warmKinds(kinds) {
     const sizes = kind.boss ? [BOSS] : kind.swarm ? [2] : [0, 1, 2];
     for (const size of sizes) {
       // kinds in the level's colours have their bodies built with the level (warmSlimes)
-      const color = kind.colors?.[kind.boss ? 0 : size];
+      const colors = kind.rainbow ?? (kind.colors ? [kind.colors[kind.boss ? 0 : size]] : []);
       for (let sqi = 0; sqi < SQUASH.length; sqi++) {
-        if (color) for (const flash of [false, true]) { slimeBody(color, size, sqi, flash); yield; }
-        for (const hp of [1, 0.7, 0.4, 0.1]) { kindOverlays({ kind, hp, maxHp: 1, stage: Math.round((1 - hp) * 3.4) }, size, sqi); yield; }
+        for (const color of colors) for (const flash of [false, true]) { slimeBody(color, size, sqi, flash, kind.aspect ?? 1); yield; }
+        for (const hp of [1, 0.7, 0.4, 0.1]) { kindOverlays({ kind, hp, maxHp: 1, stage: Math.round((1 - hp) * 3.4), asleep: true }, size, sqi); yield; }
       }
       if (kind.shield) { bubbleSprite(size); yield; }
       for (const mode of kind.boss ? ['normal', 'hurt', 'blink'] : kind.rage ? ['angry'] : []) {
